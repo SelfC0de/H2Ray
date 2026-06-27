@@ -18,7 +18,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 public final class PublicIpResolver {
-    private static final long RESOLVE_TIMEOUT_MILLIS = 9000;
+    private static final long RESOLVE_TIMEOUT_MILLIS = 4500;
     private static final Endpoint[] ENDPOINTS = {
         new Endpoint("https://api.ipify.org?format=json", ResponseType.JSON),
         new Endpoint("https://api64.ipify.org?format=json", ResponseType.JSON),
@@ -100,8 +100,8 @@ public final class PublicIpResolver {
         HttpURLConnection connection = null;
         try {
             connection = (HttpURLConnection) new URL(endpoint).openConnection();
-            connection.setConnectTimeout(6000);
-            connection.setReadTimeout(6000);
+            connection.setConnectTimeout(3500);
+            connection.setReadTimeout(3500);
             connection.setUseCaches(false);
             connection.setRequestProperty("Accept", "application/json,text/plain");
             connection.setRequestProperty("Connection", "close");

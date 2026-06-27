@@ -75,5 +75,13 @@
     <string name="checking_update">Проверка обновления…</string>
     <string name="no_update">Установлена актуальная версия</string>
     <string name="update_check_failed">Не удалось проверить обновление</string>
-    <string name="update_open_failed">Не удалось открыть страницу загрузки</string>
+    <string name="update_open_failed">Не удалось открыть установщик обновления</string>
+    <string name="update_downloading">Загрузка обновления: %1$d%%</string>
+    <string name="update_waiting_network">Ожидание сети для обновления…</string>
+    <string name="update_download_failed">Не удалось скачать обновление</string>
+    <string name="update_verification_failed">Проверка подписи обновления не пройдена</string>
+    <string name="update_install">Установить обновление</string>
+    <string name="update_permission">Разрешите установку обновлений H2Ray</string>
+    <string name="profiles_count">Добавленные серверы: %1$d</string>
+    <string name="ping_checking">Проверка…</string>
 </resources>

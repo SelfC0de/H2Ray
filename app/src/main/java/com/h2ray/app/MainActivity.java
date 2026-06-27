@@ -3,11 +3,16 @@ package com.h2ray.app;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.net.Uri;
 import android.net.VpnService;
 import android.net.TrafficStats;
@@ -17,6 +22,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Process;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.text.InputType;
 import android.text.Spannable;
 import android.text.SpannableString;
@@ -37,19 +43,19 @@ import com.h2ray.app.data.ConnectionStatusStore;
 import com.h2ray.app.data.AppSettings;
 import com.h2ray.app.network.PublicIpResolver;
 import com.h2ray.app.network.UpdateChecker;
+import com.h2ray.app.update.UpdateDownloadManager;
 import com.h2ray.app.vpn.H2RayVpnService;
+import com.h2ray.app.xray.ServerEndpoint;
 import com.h2ray.app.xray.XrayBridge;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.io.File;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 public final class MainActivity extends Activity {
     private static final int VPN_PERMISSION_REQUEST = 100;
@@ -76,15 +82,43 @@ public final class MainActivity extends Activity {
     private TextView statIp;
     private TextView statIpLabel;
     private TextView updateBadge;
+    private Button updateButton;
+    private UpdateDownloadManager updateDownloadManager;
     private final AtomicBoolean ipLookupRunning = new AtomicBoolean(false);
     private final AtomicBoolean updateCheckRunning = new AtomicBoolean(false);
     private volatile UpdateChecker.Result latestUpdate;
-    private volatile long lastIpAttempt;
+    private volatile long lastDirectIpAttempt;
+    private volatile long lastProxyIpAttempt;
+    private boolean waitingForInstallPermission;
+    private boolean installerLaunched;
+
+    private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            long completedId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+            if (completedId != updateDownloadManager.downloadId()) {
+                return;
+            }
+            UpdateDownloadManager.State state = updateDownloadManager.state();
+            renderUpdateDownload(state);
+            if (state.complete()) {
+                prepareUpdateInstallation();
+            } else if (state.failed()) {
+                updateDownloadManager.clearFailedDownload();
+                Toast.makeText(
+                    MainActivity.this,
+                    R.string.update_download_failed,
+                    Toast.LENGTH_LONG
+                ).show();
+            }
+        }
+    };
 
     private final Runnable stateUpdater = new Runnable() {
         @Override
         public void run() {
             render();
+            renderUpdateDownload(updateDownloadManager.state());
             handler.postDelayed(this, 1000);
         }
     };
@@ -101,6 +135,7 @@ public final class MainActivity extends Activity {
             connectionStatusStore.setDirectIp("");
         }
         appSettings = new AppSettings(this);
+        updateDownloadManager = new UpdateDownloadManager(this);
         connectionStatus = findViewById(R.id.connection_status);
         connectionError = findViewById(R.id.connection_error);
         profileName = findViewById(R.id.profile_name);
@@ -117,6 +152,7 @@ public final class MainActivity extends Activity {
         statIp = findViewById(R.id.stat_ip);
         statIpLabel = findViewById(R.id.stat_ip_label);
         updateBadge = findViewById(R.id.update_badge);
+        updateButton = findViewById(R.id.update_app);
 
         connectButton.setOnClickListener(view -> toggleConnection());
         importButton.setOnClickListener(view -> showImportDialog());
@@ -133,13 +169,20 @@ public final class MainActivity extends Activity {
             view -> startActivity(new Intent(this, LogsActivity.class))
         );
         updateBadge.setOnClickListener(view -> openAvailableUpdate());
-        findViewById(R.id.update_app).setOnClickListener(view -> checkForUpdates(true));
+        updateButton.setOnClickListener(view -> handleUpdateButton());
         configureSettings();
         configureRules();
         configureNavigationLabels();
         applySystemBarInsets();
         requestNotificationPermissionIfNeeded();
+        registerDownloadReceiver();
         render();
+        renderUpdateDownload(updateDownloadManager.state());
+        resumeVpnAfterInstalledUpdate();
+        discardInstalledUpdate();
+        if (updateDownloadManager.state().complete()) {
+            handler.postDelayed(this::prepareUpdateInstallation, 600);
+        }
         checkForUpdates(false);
     }
 
@@ -147,6 +190,15 @@ public final class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         handler.post(stateUpdater);
+        if (waitingForInstallPermission
+            && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+            && getPackageManager().canRequestPackageInstalls()) {
+            waitingForInstallPermission = false;
+            prepareUpdateInstallation();
+        } else if (installerLaunched) {
+            installerLaunched = false;
+            handler.postDelayed(this::resumeVpnAfterCancelledInstall, 800);
+        }
     }
 
     @Override
@@ -157,6 +209,10 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        try {
+            unregisterReceiver(downloadReceiver);
+        } catch (IllegalArgumentException ignored) {
+        }
         executor.shutdownNow();
         super.onDestroy();
     }
@@ -386,9 +442,204 @@ public final class MainActivity extends Activity {
             return;
         }
         try {
-            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(update.apkUrl)));
+            updateDownloadManager.start(update);
+            renderUpdateDownload(updateDownloadManager.state());
         } catch (Exception error) {
-            Toast.makeText(this, R.string.update_open_failed, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.update_download_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void handleUpdateButton() {
+        UpdateDownloadManager.State state = updateDownloadManager.state();
+        if (state.complete()) {
+            prepareUpdateInstallation();
+        } else if (!state.downloading()) {
+            checkForUpdates(true);
+        }
+    }
+
+    private void renderUpdateDownload(UpdateDownloadManager.State state) {
+        if (updateButton == null) {
+            return;
+        }
+        if (state.complete()) {
+            updateButton.setText(R.string.update_install);
+            updateButton.setEnabled(true);
+        } else if (state.downloading()) {
+            updateButton.setText(
+                state.percent >= 0
+                    ? getString(R.string.update_downloading, state.percent)
+                    : getString(R.string.update_waiting_network)
+            );
+            updateButton.setEnabled(false);
+        } else {
+            updateButton.setText(R.string.update_app);
+            updateButton.setEnabled(true);
+        }
+    }
+
+    private void registerDownloadReceiver() {
+        IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(downloadReceiver, filter, Context.RECEIVER_EXPORTED);
+        } else {
+            registerReceiver(downloadReceiver, filter);
+        }
+    }
+
+    private void prepareUpdateInstallation() {
+        if (!updateDownloadManager.state().complete()) {
+            return;
+        }
+        if (!verifyDownloadedUpdate()) {
+            updateDownloadManager.discardInstalledDownload();
+            renderUpdateDownload(updateDownloadManager.state());
+            Toast.makeText(
+                this,
+                R.string.update_verification_failed,
+                Toast.LENGTH_LONG
+            ).show();
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+            && !getPackageManager().canRequestPackageInstalls()) {
+            waitingForInstallPermission = true;
+            Toast.makeText(this, R.string.update_permission, Toast.LENGTH_LONG).show();
+            startActivity(new Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:" + getPackageName())
+            ));
+            return;
+        }
+
+        boolean reconnect = (H2RayVpnService.isRunning() || H2RayVpnService.isBusy())
+            && profileStore.hasActiveProfile();
+        updateDownloadManager.markReconnectRequired(reconnect);
+        if (H2RayVpnService.isRunning() || H2RayVpnService.isBusy()) {
+            startService(H2RayVpnService.stopIntent(this));
+            waitForVpnStopAndInstall(0);
+        } else {
+            launchSystemInstaller();
+        }
+    }
+
+    private boolean verifyDownloadedUpdate() {
+        File apk = updateDownloadManager.downloadedFile();
+        if (apk == null || !apk.isFile() || apk.length() == 0) {
+            return false;
+        }
+        try {
+            PackageInfo installed = getPackageManager().getPackageInfo(
+                getPackageName(),
+                PackageManager.GET_SIGNING_CERTIFICATES
+            );
+            PackageInfo archive = getPackageManager().getPackageArchiveInfo(
+                apk.getAbsolutePath(),
+                PackageManager.GET_SIGNING_CERTIFICATES
+            );
+            if (archive == null
+                || !getPackageName().equals(archive.packageName)
+                || archive.versionName == null
+                || !archive.versionName.equals(updateDownloadManager.targetVersion())
+                || installed.signingInfo == null
+                || archive.signingInfo == null) {
+                return false;
+            }
+            Signature[] installedSigners = installed.signingInfo.getApkContentsSigners();
+            Signature[] archiveSigners = archive.signingInfo.getApkContentsSigners();
+            if (installedSigners.length != archiveSigners.length) {
+                return false;
+            }
+            for (Signature installedSigner : installedSigners) {
+                boolean found = false;
+                for (Signature archiveSigner : archiveSigners) {
+                    if (installedSigner.equals(archiveSigner)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (Exception error) {
+            return false;
+        }
+    }
+
+    private void waitForVpnStopAndInstall(int attempt) {
+        if ((!H2RayVpnService.isRunning() && !H2RayVpnService.isBusy()) || attempt >= 12) {
+            launchSystemInstaller();
+            return;
+        }
+        handler.postDelayed(() -> waitForVpnStopAndInstall(attempt + 1), 250);
+    }
+
+    private void launchSystemInstaller() {
+        Uri apkUri = updateDownloadManager.downloadedUri();
+        if (apkUri == null) {
+            Toast.makeText(this, R.string.update_download_failed, Toast.LENGTH_LONG).show();
+            return;
+        }
+        try {
+            Intent install = new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(apkUri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            installerLaunched = true;
+            startActivity(install);
+        } catch (Exception error) {
+            installerLaunched = false;
+            Toast.makeText(this, R.string.update_open_failed, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void resumeVpnAfterInstalledUpdate() {
+        if (!updateDownloadManager.reconnectRequired()) {
+            return;
+        }
+        if (!currentVersion().equals(updateDownloadManager.targetVersion())) {
+            return;
+        }
+        updateDownloadManager.clearReconnectRequired();
+        handler.postDelayed(this::startVpnAfterUpdate, 1000);
+    }
+
+    private void discardInstalledUpdate() {
+        String target = updateDownloadManager.targetVersion();
+        if (!target.isEmpty() && currentVersion().equals(target)) {
+            updateDownloadManager.discardInstalledDownload();
+            renderUpdateDownload(updateDownloadManager.state());
+        }
+    }
+
+    private void resumeVpnAfterCancelledInstall() {
+        if (!updateDownloadManager.reconnectRequired()
+            || currentVersion().equals(updateDownloadManager.targetVersion())) {
+            return;
+        }
+        updateDownloadManager.clearReconnectRequired();
+        startVpnAfterUpdate();
+    }
+
+    private void startVpnAfterUpdate() {
+        if (!profileStore.hasActiveProfile() || H2RayVpnService.isRunning()
+            || H2RayVpnService.isBusy()) {
+            return;
+        }
+        Intent permissionIntent = VpnService.prepare(this);
+        if (permissionIntent == null) {
+            startVpn();
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private String currentVersion() {
+        try {
+            String version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            return version == null ? "" : version;
+        } catch (Exception error) {
+            return "";
         }
     }
 
@@ -434,6 +685,9 @@ public final class MainActivity extends Activity {
     private void renderProfiles() {
         profilesList.removeAllViews();
         List<ProfileStore.Profile> profiles = profileStore.getProfiles();
+        ((TextView) findViewById(R.id.profiles_title)).setText(
+            getString(R.string.profiles_count, profiles.size())
+        );
         ProfileStore.Profile active = profileStore.getActiveProfile();
         if (profiles.isEmpty()) {
             TextView empty = new TextView(this);
@@ -448,9 +702,14 @@ public final class MainActivity extends Activity {
             TextView row = new TextView(this);
             String marker = active != null && active.id.equals(profile.id) ? "●  " : "○  ";
             String ping = profile.ping < 0
-                ? "—"
+                ? profile.ping == -2 ? getString(R.string.ping_checking) : "—"
                 : profile.ping == Long.MAX_VALUE ? getString(R.string.ping_failed) : profile.ping + " ms";
-            row.setText(marker + profile.name + "\n     " + profile.protocol + "  ·  " + ping);
+            ServerEndpoint endpoint = ServerEndpoint.fromConfig(profile.config);
+            String server = endpoint == null ? profile.protocol : endpoint.displayName();
+            row.setText(
+                marker + profile.name + "\n     "
+                    + profile.protocol + "  ·  " + server + "  ·  " + ping
+            );
             row.setTextColor(getColor(R.color.text_primary));
             row.setTextSize(14);
             row.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -492,24 +751,27 @@ public final class MainActivity extends Activity {
             Toast.makeText(this, R.string.ping_requires_disconnect, Toast.LENGTH_LONG).show();
             return;
         }
+        ProfileStore.Profile profile = profileStore.getActiveProfile();
+        if (profile == null) {
+            return;
+        }
+        profileStore.updatePing(profile.id, -2);
+        renderProfiles();
         executor.execute(() -> {
-            for (ProfileStore.Profile profile : profileStore.getProfiles()) {
-                profileStore.updatePing(profile.id, measurePing(profile));
-                runOnUiThread(this::renderProfiles);
-            }
+            profileStore.updatePing(profile.id, measurePing(profile));
+            runOnUiThread(this::renderProfiles);
         });
     }
 
     private long measurePing(ProfileStore.Profile profile) {
         try {
-            JSONObject config = new JSONObject(profile.config);
-            JSONArray outbounds = config.getJSONArray("outbounds");
-            JSONObject settings = outbounds.getJSONObject(0).getJSONObject("settings");
-            String address = settings.getString("address");
-            int port = settings.getInt("port");
+            ServerEndpoint endpoint = ServerEndpoint.fromConfig(profile.config);
+            if (endpoint == null) {
+                return Long.MAX_VALUE;
+            }
             long start = System.nanoTime();
             try (Socket socket = new Socket()) {
-                socket.connect(new InetSocketAddress(address, port), 3000);
+                socket.connect(new InetSocketAddress(endpoint.address, endpoint.port), 3500);
             }
             return (System.nanoTime() - start) / 1_000_000L;
         } catch (Exception error) {
@@ -746,7 +1008,7 @@ public final class MainActivity extends Activity {
     private void resolvePublicIp(boolean force) {
         if (!H2RayVpnService.isRunning()) {
             connectionStatusStore.setDirectIp("");
-            lastIpAttempt = 0;
+            lastDirectIpAttempt = 0;
             resolveDirectIp();
             return;
         }
@@ -754,13 +1016,13 @@ public final class MainActivity extends Activity {
             return;
         }
         long now = SystemClock.elapsedRealtime();
-        if (!force && now - lastIpAttempt < 30000) {
+        if (!force && now - lastProxyIpAttempt < 10000) {
             return;
         }
         if (!ipLookupRunning.compareAndSet(false, true)) {
             return;
         }
-        lastIpAttempt = now;
+        lastProxyIpAttempt = now;
         executor.execute(() -> {
             String ip = PublicIpResolver.resolve();
             final String result = ip;
@@ -782,10 +1044,10 @@ public final class MainActivity extends Activity {
             return;
         }
         long now = SystemClock.elapsedRealtime();
-        if (now - lastIpAttempt < 30000 || !ipLookupRunning.compareAndSet(false, true)) {
+        if (now - lastDirectIpAttempt < 30000 || !ipLookupRunning.compareAndSet(false, true)) {
             return;
         }
-        lastIpAttempt = now;
+        lastDirectIpAttempt = now;
         executor.execute(() -> {
             String result = PublicIpResolver.resolve();
             if (!result.isEmpty() && !H2RayVpnService.isRunning()) {
