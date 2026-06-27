@@ -3,6 +3,10 @@ package com.h2ray.app.data;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
 public final class AppSettings {
     private static final String PREFERENCES = "h2ray_settings";
     private final SharedPreferences preferences;
@@ -42,6 +46,35 @@ public final class AppSettings {
 
     public void setDns(String value) {
         preferences.edit().putString("dns", value).apply();
+    }
+
+    public String xrayDns() {
+        return preferences.getString("xray_dns", dns());
+    }
+
+    public void setDns(String androidDns, String xrayDns) {
+        preferences.edit()
+            .putString("dns", androidDns)
+            .putString("xray_dns", xrayDns)
+            .apply();
+    }
+
+    public String customDomains() {
+        return preferences.getString("custom_domains", "");
+    }
+
+    public void setCustomDomains(String value) {
+        preferences.edit().putString("custom_domains", value).apply();
+    }
+
+    public Set<String> bypassApps() {
+        return new HashSet<>(
+            preferences.getStringSet("bypass_apps", Collections.emptySet())
+        );
+    }
+
+    public void setBypassApps(Set<String> values) {
+        preferences.edit().putStringSet("bypass_apps", new HashSet<>(values)).apply();
     }
 
     public int mtu() {
@@ -125,6 +158,14 @@ public final class AppSettings {
 
     public void setDesiredVpnRunning(boolean value) {
         preferences.edit().putBoolean("desired_vpn_running", value).commit();
+    }
+
+    public boolean appLock() {
+        return preferences.getBoolean("app_lock", false);
+    }
+
+    public void setAppLock(boolean value) {
+        preferences.edit().putBoolean("app_lock", value).apply();
     }
 
     private void migrateSecureDefaults() {

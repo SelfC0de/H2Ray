@@ -18,16 +18,18 @@ public final class ProfileStore {
     private static final String LEGACY_CONFIG = "active_config";
 
     private final SharedPreferences preferences;
+    private final SecureStorage secureStorage = new SecureStorage();
 
     public ProfileStore(Context context) {
         preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
         migrateLegacyProfile();
+        migrateEncryption();
     }
 
     public void saveActiveProfile(String name, String protocol, String config, String source) {
         List<Profile> profiles = getProfiles();
         Profile profile = new Profile(
-            UUID.randomUUID().toString(), name, protocol, config, source, -1
+            UUID.randomUUID().toString(), name, protocol, config, source, -1, "", false
         );
         profiles.add(profile);
         saveProfiles(profiles, profile.id);
@@ -38,7 +40,10 @@ public final class ProfileStore {
         try {
             JSONArray array = new JSONArray(preferences.getString(KEY_PROFILES, "[]"));
             for (int index = 0; index < array.length(); index++) {
-                profiles.add(Profile.fromJson(array.getJSONObject(index)));
+                Profile profile = Profile.fromJson(array.getJSONObject(index));
+                profile.config = secureStorage.decrypt(profile.config);
+                profile.source = secureStorage.decrypt(profile.source);
+                profiles.add(profile);
             }
         } catch (JSONException ignored) {
             preferences.edit().remove(KEY_PROFILES).apply();
@@ -76,11 +81,50 @@ public final class ProfileStore {
         saveProfiles(profiles, preferences.getString(KEY_ACTIVE_ID, ""));
     }
 
+    public void update(String id, String name, String config, String source, String group) {
+        List<Profile> profiles = getProfiles();
+        for (Profile profile : profiles) {
+            if (profile.id.equals(id)) {
+                profile.name = name;
+                profile.config = config;
+                profile.source = source;
+                profile.group = group;
+                break;
+            }
+        }
+        saveProfiles(profiles, preferences.getString(KEY_ACTIVE_ID, ""));
+    }
+
+    public void toggleFavorite(String id) {
+        List<Profile> profiles = getProfiles();
+        for (Profile profile : profiles) {
+            if (profile.id.equals(id)) {
+                profile.favorite = !profile.favorite;
+                break;
+            }
+        }
+        saveProfiles(profiles, preferences.getString(KEY_ACTIVE_ID, ""));
+    }
+
     public void delete(String id) {
         List<Profile> profiles = getProfiles();
         profiles.removeIf(profile -> profile.id.equals(id));
         String activeId = preferences.getString(KEY_ACTIVE_ID, "");
         if (id.equals(activeId)) {
+            activeId = profiles.isEmpty() ? "" : profiles.get(0).id;
+        }
+        saveProfiles(profiles, activeId);
+    }
+
+    public void deleteGroup(String group) {
+        List<Profile> profiles = getProfiles();
+        profiles.removeIf(profile -> group.equals(profile.group));
+        String activeId = preferences.getString(KEY_ACTIVE_ID, "");
+        boolean activeExists = false;
+        for (Profile profile : profiles) {
+            activeExists |= profile.id.equals(activeId);
+        }
+        if (!activeExists) {
             activeId = profiles.isEmpty() ? "" : profiles.get(0).id;
         }
         saveProfiles(profiles, activeId);
@@ -116,7 +160,14 @@ public final class ProfileStore {
     private void saveProfiles(List<Profile> profiles, String activeId) {
         JSONArray array = new JSONArray();
         for (Profile profile : profiles) {
-            array.put(profile.toJson());
+            JSONObject json = profile.toJson();
+            try {
+                json.put("config", secureStorage.encrypt(profile.config));
+                json.put("source", secureStorage.encrypt(profile.source));
+            } catch (JSONException error) {
+                throw new IllegalStateException(error);
+            }
+            array.put(json);
         }
         preferences.edit()
             .putString(KEY_PROFILES, array.toString())
@@ -136,7 +187,9 @@ public final class ProfileStore {
             preferences.getString("active_protocol", "Xray"),
             legacyConfig,
             preferences.getString("active_source", ""),
-            -1
+            -1,
+            "",
+            false
         );
         List<Profile> migrated = new ArrayList<>();
         migrated.add(profile);
@@ -149,21 +202,43 @@ public final class ProfileStore {
             .apply();
     }
 
+    private void migrateEncryption() {
+        String raw = preferences.getString(KEY_PROFILES, "[]");
+        if (raw == null || raw.equals("[]") || raw.contains("\"config\":\"enc:v1:")) {
+            return;
+        }
+        List<Profile> profiles = getProfiles();
+        saveProfiles(profiles, preferences.getString(KEY_ACTIVE_ID, ""));
+    }
+
     public static final class Profile {
         public final String id;
-        public final String name;
+        public String name;
         public final String protocol;
-        public final String config;
-        public final String source;
+        public String config;
+        public String source;
         public long ping;
+        public String group;
+        public boolean favorite;
 
-        Profile(String id, String name, String protocol, String config, String source, long ping) {
+        Profile(
+            String id,
+            String name,
+            String protocol,
+            String config,
+            String source,
+            long ping,
+            String group,
+            boolean favorite
+        ) {
             this.id = id;
             this.name = name;
             this.protocol = protocol;
             this.config = config;
             this.source = source;
             this.ping = ping;
+            this.group = group;
+            this.favorite = favorite;
         }
 
         JSONObject toJson() {
@@ -174,7 +249,9 @@ public final class ProfileStore {
                     .put("protocol", protocol)
                     .put("config", config)
                     .put("source", source)
-                    .put("ping", ping);
+                    .put("ping", ping)
+                    .put("group", group)
+                    .put("favorite", favorite);
             } catch (JSONException error) {
                 throw new IllegalStateException(error);
             }
@@ -187,7 +264,9 @@ public final class ProfileStore {
                 json.optString("protocol", "Xray"),
                 json.optString("config", ""),
                 json.optString("source", ""),
-                json.optLong("ping", -1)
+                json.optLong("ping", -1),
+                json.optString("group", ""),
+                json.optBoolean("favorite", false)
             );
         }
     }

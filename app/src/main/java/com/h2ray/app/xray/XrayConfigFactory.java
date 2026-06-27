@@ -73,7 +73,7 @@ public final class XrayConfigFactory {
         config.put("log", new JSONObject().put("loglevel", "warning"));
         config.put("dns", new JSONObject()
             .put("queryStrategy", settings.ipv6() ? "UseIP" : "UseIPv4")
-            .put("servers", new JSONArray().put(settings.dns())));
+            .put("servers", new JSONArray().put(settings.xrayDns())));
         config.put("inbounds", new JSONArray().put(tunInbound));
         config.put("outbounds", runtimeOutbounds);
         JSONArray rules = new JSONArray();
@@ -96,6 +96,13 @@ public final class XrayConfigFactory {
                 .put("port", "443")
                 .put("outboundTag", "block"));
         }
+        JSONArray customRules = customRules(
+            settings.customDomains(),
+            "proxy_only".equals(settings.routingMode()) ? "proxy" : "direct"
+        );
+        for (int index = 0; index < customRules.length(); index++) {
+            rules.put(customRules.getJSONObject(index));
+        }
         if ("direct".equals(settings.routingMode())) {
             rules.put(new JSONObject()
                 .put("type", "field")
@@ -105,6 +112,12 @@ public final class XrayConfigFactory {
             rules.put(new JSONObject()
                 .put("type", "field")
                 .put("ip", privateNetworks)
+                .put("outboundTag", "direct"));
+        }
+        if ("proxy_only".equals(settings.routingMode())) {
+            rules.put(new JSONObject()
+                .put("type", "field")
+                .put("network", "tcp,udp")
                 .put("outboundTag", "direct"));
         }
         if ("rules".equals(settings.routingMode()) && settings.bypassRu()) {
@@ -123,6 +136,45 @@ public final class XrayConfigFactory {
             .put("domainStrategy", "IPIfNonMatch")
             .put("rules", rules));
         return config.toString();
+    }
+
+    private static JSONArray customRules(String source, String outboundTag)
+        throws JSONException {
+        JSONArray result = new JSONArray();
+        if (source == null || source.trim().isEmpty()) {
+            return result;
+        }
+        JSONArray domains = new JSONArray();
+        JSONArray ips = new JSONArray();
+        for (String raw : source.split("\\R")) {
+            String value = raw.trim();
+            if (value.isEmpty() || value.startsWith("#")) {
+                continue;
+            }
+            String lower = value.toLowerCase(Locale.ROOT);
+            if (lower.startsWith("geoip:")
+                || value.matches("[0-9a-fA-F:.]+(?:/\\d{1,3})?")) {
+                ips.put(value);
+            } else {
+                domains.put(value.contains(":") ? value : "domain:" + value);
+            }
+        }
+        if (domains.length() == 0 && ips.length() == 0) {
+            return result;
+        }
+        if (domains.length() > 0) {
+            result.put(new JSONObject()
+                .put("type", "field")
+                .put("outboundTag", outboundTag)
+                .put("domain", domains));
+        }
+        if (ips.length() > 0) {
+            result.put(new JSONObject()
+                .put("type", "field")
+                .put("outboundTag", outboundTag)
+                .put("ip", ips));
+        }
+        return result;
     }
 
     private static void normalizeStreamSettings(JSONObject outbound) throws JSONException {

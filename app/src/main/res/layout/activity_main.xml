@@ -339,6 +339,27 @@
             android:orientation="vertical"
             android:visibility="gone">
 
+            <EditText
+                android:id="@+id/profile_search"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:hint="@string/search_profiles"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:singleLine="true"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary" />
+
+            <Button
+                android:id="@+id/sort_profiles"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:text="@string/sort_profiles"
+                android:textAllCaps="false" />
+
             <Button
                 android:id="@+id/select_fastest_profile"
                 android:layout_width="match_parent"
@@ -353,6 +374,22 @@
                 android:layout_height="48dp"
                 android:layout_marginTop="8dp"
                 android:text="@string/check_compatibility"
+                android:textAllCaps="false" />
+
+            <Button
+                android:id="@+id/add_subscription"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:text="@string/add_subscription"
+                android:textAllCaps="false" />
+
+            <Button
+                android:id="@+id/update_subscriptions"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:text="@string/update_subscriptions"
                 android:textAllCaps="false" />
         </LinearLayout>
 
@@ -493,6 +530,38 @@
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
                 android:text="@string/domain_sniffing"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/rule_custom_domains"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/custom_domains"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/rule_apps"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/bypass_apps"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
                 android:visibility="gone" />
@@ -709,6 +778,36 @@
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
                 android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/security_header"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="22dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/bg_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/security_collapsed"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <Switch
+                android:id="@+id/setting_app_lock"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:background="@drawable/bg_card"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/app_lock"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
         </LinearLayout>
     </ScrollView>
 

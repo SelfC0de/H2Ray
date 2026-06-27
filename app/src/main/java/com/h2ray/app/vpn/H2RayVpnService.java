@@ -39,6 +39,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 public final class H2RayVpnService extends VpnService {
     public static final String ACTION_START = "com.h2ray.app.action.START";
@@ -149,6 +152,13 @@ public final class H2RayVpnService extends VpnService {
                     .addAddress("10.10.0.2", 30)
                     .addRoute("0.0.0.0", 0)
                     .addDnsServer(settings.dns());
+                for (String packageName : settings.bypassApps()) {
+                    try {
+                        builder.addDisallowedApplication(packageName);
+                    } catch (android.content.pm.PackageManager.NameNotFoundException error) {
+                        logStore.add("WARN", "Приложение правила не найдено: " + packageName);
+                    }
+                }
                 builder.addAddress("fd00:10:10::2", 126)
                     .addRoute("::", 0);
 
@@ -192,6 +202,7 @@ public final class H2RayVpnService extends VpnService {
                     "WARN",
                     "Попытка " + startAttempt + " не удалась, повтор подключения"
                 );
+                selectReachableFallback(settings.connectionTimeoutSeconds());
                 try {
                     Thread.sleep(Math.min(5000L, 1000L * startAttempt));
                 } catch (InterruptedException interrupted) {
@@ -312,6 +323,35 @@ public final class H2RayVpnService extends VpnService {
                 new InetSocketAddress(endpoint.address, endpoint.port),
                 timeoutSeconds * 1000
             );
+        }
+    }
+
+    private void selectReachableFallback(int timeoutSeconds) {
+        ProfileStore store = new ProfileStore(this);
+        ProfileStore.Profile active = store.getActiveProfile();
+        List<ProfileStore.Profile> profiles = new ArrayList<>(store.getProfiles());
+        profiles.sort(Comparator.comparingLong(profile ->
+            profile.ping < 0 || profile.ping == Long.MAX_VALUE
+                ? Long.MAX_VALUE
+                : profile.ping));
+        for (ProfileStore.Profile profile : profiles) {
+            if (active != null && active.id.equals(profile.id)) {
+                continue;
+            }
+            ServerEndpoint endpoint = ServerEndpoint.fromConfig(profile.config);
+            if (endpoint == null) {
+                continue;
+            }
+            try (Socket socket = new Socket()) {
+                socket.connect(
+                    new InetSocketAddress(endpoint.address, endpoint.port),
+                    Math.min(timeoutSeconds * 1000, 4000)
+                );
+                store.select(profile.id);
+                logStore.add("INFO", "Выбран резервный профиль: " + profile.name);
+                return;
+            } catch (IOException ignored) {
+            }
         }
     }
 

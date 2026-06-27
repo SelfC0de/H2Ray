@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DownloadManager;
+import android.app.KeyguardManager;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -13,7 +14,9 @@ import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
+import android.content.pm.ResolveInfo;
 import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.net.VpnService;
 import android.net.TrafficStats;
@@ -26,6 +29,8 @@ import android.os.SystemClock;
 import android.provider.Settings;
 import android.provider.OpenableColumns;
 import android.text.InputType;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.style.RelativeSizeSpan;
@@ -36,6 +41,7 @@ import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ImageView;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -43,6 +49,7 @@ import android.widget.Toast;
 import com.h2ray.app.data.ProfileStore;
 import com.h2ray.app.data.ConnectionStatusStore;
 import com.h2ray.app.data.AppSettings;
+import com.h2ray.app.data.SubscriptionStore;
 import com.h2ray.app.network.PublicIpResolver;
 import com.h2ray.app.network.UpdateChecker;
 import com.h2ray.app.update.UpdateDownloadManager;
@@ -53,6 +60,8 @@ import com.h2ray.app.xray.XrayBridge;
 import com.h2ray.app.xray.XrayConfigFactory;
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
+import com.google.zxing.BarcodeFormat;
+import com.journeyapps.barcodescanner.BarcodeEncoder;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -61,8 +70,13 @@ import java.net.Socket;
 import java.io.File;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -72,6 +86,8 @@ public final class MainActivity extends Activity {
     private static final int NOTIFICATION_PERMISSION_REQUEST = 101;
     private static final int FILE_IMPORT_REQUEST = 102;
     private static final int CAMERA_PERMISSION_REQUEST = 103;
+    private static final int FILE_EXPORT_REQUEST = 104;
+    private static final int APP_UNLOCK_REQUEST = 105;
     private static final int MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -110,6 +126,14 @@ public final class MainActivity extends Activity {
     private boolean connectionSettingsExpanded;
     private boolean diagnosticsExpanded;
     private boolean updatesExpanded;
+    private boolean securityExpanded;
+    private boolean appUnlocked;
+    private boolean unlockRequested;
+    private long lastPausedAt;
+    private String profileSearch = "";
+    private boolean profileSorting;
+    private String pendingProfileExport;
+    private SubscriptionStore subscriptionStore;
 
     private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
         @Override
@@ -154,6 +178,7 @@ public final class MainActivity extends Activity {
             connectionStatusStore.setDirectIp("");
         }
         appSettings = new AppSettings(this);
+        subscriptionStore = new SubscriptionStore(this);
         updateDownloadManager = new UpdateDownloadManager(this);
         connectionStatus = findViewById(R.id.connection_status);
         connectionError = findViewById(R.id.connection_error);
@@ -196,6 +221,32 @@ public final class MainActivity extends Activity {
         findViewById(R.id.check_profile_compatibility).setOnClickListener(
             view -> checkProfileCompatibility()
         );
+        findViewById(R.id.sort_profiles).setOnClickListener(view -> {
+            profileSorting = !profileSorting;
+            renderProfiles();
+        });
+        ((EditText) findViewById(R.id.profile_search)).addTextChangedListener(
+            new TextWatcher() {
+                @Override public void beforeTextChanged(
+                    CharSequence value, int start, int count, int after
+                ) {
+                }
+                @Override public void onTextChanged(
+                    CharSequence value, int start, int before, int count
+                ) {
+                    profileSearch = value == null ? "" : value.toString().trim();
+                    renderProfiles();
+                }
+                @Override public void afterTextChanged(Editable value) {
+                }
+            }
+        );
+        findViewById(R.id.add_subscription).setOnClickListener(
+            view -> showAddSubscriptionDialog()
+        );
+        findViewById(R.id.update_subscriptions).setOnClickListener(
+            view -> updateSubscriptions(true)
+        );
         findViewById(R.id.profiles_menu_button).setOnClickListener(
             view -> showProfilesMenu()
         );
@@ -221,11 +272,16 @@ public final class MainActivity extends Activity {
             handler.postDelayed(this::prepareUpdateInstallation, 600);
         }
         checkForUpdates(false);
+        updateSubscriptions(false);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        if (lastPausedAt > 0 && SystemClock.elapsedRealtime() - lastPausedAt > 30_000) {
+            appUnlocked = false;
+        }
+        requestAppUnlockIfNeeded();
         handler.post(stateUpdater);
         if (waitingForInstallPermission
             && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
@@ -241,6 +297,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onPause() {
         handler.removeCallbacks(stateUpdater);
+        lastPausedAt = SystemClock.elapsedRealtime();
         super.onPause();
     }
 
@@ -298,8 +355,23 @@ public final class MainActivity extends Activity {
             importDocument(data.getData());
             return;
         }
+        if (requestCode == FILE_EXPORT_REQUEST && resultCode == RESULT_OK
+            && data != null && data.getData() != null && pendingProfileExport != null) {
+            writeProfileExport(data.getData(), pendingProfileExport);
+            pendingProfileExport = null;
+            return;
+        }
         if (requestCode == VPN_PERMISSION_REQUEST && resultCode == RESULT_OK) {
             startVpn();
+            return;
+        }
+        if (requestCode == APP_UNLOCK_REQUEST) {
+            unlockRequested = false;
+            if (resultCode == RESULT_OK) {
+                appUnlocked = true;
+            } else {
+                finish();
+            }
         }
     }
 
@@ -924,11 +996,31 @@ public final class MainActivity extends Activity {
 
     private void renderProfiles() {
         profilesList.removeAllViews();
-        List<ProfileStore.Profile> profiles = profileStore.getProfiles();
+        List<ProfileStore.Profile> allProfiles = profileStore.getProfiles();
+        List<ProfileStore.Profile> profiles = new ArrayList<>();
+        String query = profileSearch.toLowerCase(Locale.ROOT);
+        for (ProfileStore.Profile profile : allProfiles) {
+            String searchable =
+                (profile.name + " " + profile.protocol + " " + profile.group)
+                    .toLowerCase(Locale.ROOT);
+            if (query.isEmpty() || searchable.contains(query)) {
+                profiles.add(profile);
+            }
+        }
+        if (profileSorting) {
+            profiles.sort(
+                Comparator.comparing((ProfileStore.Profile item) -> !item.favorite)
+                    .thenComparingLong(item ->
+                        item.ping < 0 || item.ping == Long.MAX_VALUE
+                            ? Long.MAX_VALUE
+                            : item.ping)
+                    .thenComparing(item -> item.name.toLowerCase(Locale.ROOT))
+            );
+        }
         ((TextView) findViewById(R.id.profiles_title)).setText(
             getString(
                 profilesExpanded ? R.string.profiles_expanded : R.string.profiles_collapsed,
-                profiles.size()
+                allProfiles.size()
             )
         );
         ProfileStore.Profile active = profileStore.getActiveProfile();
@@ -944,14 +1036,16 @@ public final class MainActivity extends Activity {
         for (ProfileStore.Profile profile : profiles) {
             TextView row = new TextView(this);
             String marker = active != null && active.id.equals(profile.id) ? "●  " : "○  ";
+            String favorite = profile.favorite ? "★ " : "";
+            String group = profile.group.trim().isEmpty() ? "" : "\n     " + profile.group;
             String ping = profile.ping < 0
                 ? profile.ping == -2 ? getString(R.string.ping_checking) : "—"
                 : profile.ping == Long.MAX_VALUE ? getString(R.string.ping_failed) : profile.ping + " ms";
             ServerEndpoint endpoint = ServerEndpoint.fromConfig(profile.config);
             String server = endpoint == null ? profile.protocol : endpoint.displayName();
             row.setText(
-                marker + profile.name + "\n     "
-                    + profile.protocol + "  ·  " + server + "  ·  " + ping
+                marker + favorite + profile.name + "\n     "
+                    + profile.protocol + "  ·  " + server + "  ·  " + ping + group
             );
             row.setTextColor(getColor(R.color.text_primary));
             row.setTextSize(14);
@@ -959,7 +1053,8 @@ public final class MainActivity extends Activity {
             row.setPadding(16, 10, 16, 10);
             row.setBackgroundResource(R.drawable.bg_card);
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(72)
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(profile.group.trim().isEmpty() ? 72 : 88)
             );
             params.bottomMargin = dp(10);
             row.setLayoutParams(params);
@@ -969,7 +1064,7 @@ public final class MainActivity extends Activity {
                 renderProfiles();
             });
             row.setOnLongClickListener(view -> {
-                confirmDeleteProfile(profile);
+                showProfileManagement(profile);
                 return true;
             });
             profilesList.addView(row);
@@ -987,6 +1082,180 @@ public final class MainActivity extends Activity {
                 renderProfiles();
             })
             .show();
+    }
+
+    private void showProfileManagement(ProfileStore.Profile profile) {
+        String[] actions = {
+            getString(R.string.edit_profile),
+            getString(R.string.toggle_favorite),
+            getString(R.string.export_profile_file),
+            getString(R.string.export_profile_qr),
+            getString(R.string.delete_profile)
+        };
+        new AlertDialog.Builder(this)
+            .setTitle(profile.name)
+            .setItems(actions, (dialog, which) -> {
+                if (which == 0) {
+                    showEditProfileDialog(profile);
+                } else if (which == 1) {
+                    profileStore.toggleFavorite(profile.id);
+                    renderProfiles();
+                } else if (which == 2) {
+                    exportProfileFile(profile);
+                } else if (which == 3) {
+                    showProfileQr(profile);
+                } else {
+                    confirmDeleteProfile(profile);
+                }
+            })
+            .show();
+    }
+
+    private void showEditProfileDialog(ProfileStore.Profile profile) {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(20), dp(8), dp(20), 0);
+        EditText name = new EditText(this);
+        name.setHint(R.string.profile_name_label);
+        name.setText(profile.name);
+        EditText group = new EditText(this);
+        group.setHint(R.string.profile_group);
+        group.setText(profile.group);
+        EditText config = new EditText(this);
+        config.setHint(R.string.import_hint);
+        config.setMinLines(6);
+        config.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        config.setText(profile.source.trim().isEmpty() ? profile.config : profile.source);
+        content.addView(name);
+        content.addView(group);
+        content.addView(config);
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.edit_profile)
+            .setView(content)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                try {
+                    List<ProfileImporter.ProfileData> parsed = ProfileImporter.importContent(
+                        config.getText().toString(),
+                        name.getText().toString()
+                    );
+                    if (parsed.size() != 1) {
+                        throw new IllegalArgumentException("Для редактирования нужен один профиль");
+                    }
+                    ProfileImporter.ProfileData data = parsed.get(0);
+                    profileStore.update(
+                        profile.id,
+                        name.getText().toString().trim().isEmpty()
+                            ? data.name
+                            : name.getText().toString().trim(),
+                        data.config,
+                        data.source,
+                        group.getText().toString().trim()
+                    );
+                    render();
+                    renderProfiles();
+                    Toast.makeText(this, R.string.profile_saved, Toast.LENGTH_SHORT).show();
+                } catch (Exception error) {
+                    inputError(error.getMessage());
+                }
+            })
+            .show();
+    }
+
+    private String exportContent(ProfileStore.Profile profile) {
+        return profile.source == null || profile.source.trim().isEmpty()
+            ? profile.config
+            : profile.source;
+    }
+
+    private void exportProfileFile(ProfileStore.Profile profile) {
+        pendingProfileExport = exportContent(profile);
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("text/plain")
+            .putExtra(Intent.EXTRA_TITLE, profile.name.replaceAll("[^\\p{L}\\p{N}._-]", "_") + ".txt");
+        startActivityForResult(intent, FILE_EXPORT_REQUEST);
+    }
+
+    private void writeProfileExport(Uri uri, String content) {
+        executor.execute(() -> {
+            try (OutputStream output = getContentResolver().openOutputStream(uri, "wt")) {
+                if (output == null) {
+                    throw new IllegalStateException("Не удалось открыть файл");
+                }
+                output.write(content.getBytes(StandardCharsets.UTF_8));
+            } catch (Exception error) {
+                runOnUiThread(() -> inputError(error.getMessage()));
+            }
+        });
+    }
+
+    private void showProfileQr(ProfileStore.Profile profile) {
+        try {
+            Bitmap bitmap = new BarcodeEncoder().encodeBitmap(
+                exportContent(profile),
+                BarcodeFormat.QR_CODE,
+                dp(300),
+                dp(300)
+            );
+            ImageView image = new ImageView(this);
+            image.setImageBitmap(bitmap);
+            image.setPadding(dp(12), dp(12), dp(12), dp(12));
+            new AlertDialog.Builder(this)
+                .setTitle(profile.name)
+                .setView(image)
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
+        } catch (Exception error) {
+            inputError(error.getMessage());
+        }
+    }
+
+    private void showAddSubscriptionDialog() {
+        EditText input = new EditText(this);
+        input.setHint(R.string.subscription_url);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        input.setPadding(dp(24), dp(12), dp(24), dp(12));
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.add_subscription)
+            .setView(input)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                try {
+                    subscriptionStore.add(input.getText().toString(), 24);
+                    Toast.makeText(this, R.string.subscription_added, Toast.LENGTH_SHORT).show();
+                    updateSubscriptions(true);
+                } catch (Exception error) {
+                    inputError(error.getMessage());
+                }
+            })
+            .show();
+    }
+
+    private void updateSubscriptions(boolean force) {
+        if (subscriptionStore.urls().isEmpty()) {
+            return;
+        }
+        executor.execute(() -> {
+            try {
+                int count = subscriptionStore.updateDue(profileStore, force);
+                runOnUiThread(() -> {
+                    render();
+                    renderProfiles();
+                    if (force) {
+                        Toast.makeText(
+                            this,
+                            getString(R.string.subscription_updated, count),
+                            Toast.LENGTH_LONG
+                        ).show();
+                    }
+                });
+            } catch (Exception error) {
+                if (force) {
+                    runOnUiThread(() -> inputError(error.getMessage()));
+                }
+            }
+        });
     }
 
     private void pingProfiles(boolean selectFastest) {
@@ -1106,6 +1375,7 @@ public final class MainActivity extends Activity {
         Switch ipv6 = findViewById(R.id.setting_ipv6);
         Switch autoReconnect = findViewById(R.id.setting_auto_reconnect);
         Switch restoreBoot = findViewById(R.id.setting_restore_boot);
+        Switch appLock = findViewById(R.id.setting_app_lock);
         ipv6.setOnCheckedChangeListener((button, value) -> {
             appSettings.setIpv6(value);
             settingsChanged();
@@ -1114,6 +1384,23 @@ public final class MainActivity extends Activity {
             appSettings.setAutoReconnect(value));
         restoreBoot.setOnCheckedChangeListener((button, value) ->
             appSettings.setRestoreAfterBoot(value));
+        appLock.setOnCheckedChangeListener((button, value) -> {
+            if (value == appSettings.appLock()) {
+                return;
+            }
+            if (!value) {
+                appSettings.setAppLock(false);
+                return;
+            }
+            KeyguardManager keyguard = getSystemService(KeyguardManager.class);
+            if (keyguard == null || !keyguard.isDeviceSecure()) {
+                button.setChecked(false);
+                Toast.makeText(this, R.string.device_lock_required, Toast.LENGTH_LONG).show();
+                return;
+            }
+            appSettings.setAppLock(true);
+            appUnlocked = true;
+        });
         findViewById(R.id.setting_dns).setOnClickListener(view -> chooseDns());
         findViewById(R.id.setting_mtu).setOnClickListener(view -> chooseMtu());
         findViewById(R.id.setting_retry_policy).setOnClickListener(
@@ -1128,6 +1415,9 @@ public final class MainActivity extends Activity {
         findViewById(R.id.updates_header).setOnClickListener(
             view -> toggleUpdates()
         );
+        findViewById(R.id.security_header).setOnClickListener(
+            view -> toggleSecurity()
+        );
         renderSettings();
     }
 
@@ -1139,8 +1429,9 @@ public final class MainActivity extends Activity {
         ((Switch) findViewById(R.id.setting_restore_boot)).setChecked(
             appSettings.restoreAfterBoot()
         );
+        ((Switch) findViewById(R.id.setting_app_lock)).setChecked(appSettings.appLock());
         ((TextView) findViewById(R.id.setting_dns)).setText(
-            getString(R.string.dns_label, appSettings.dns())
+            getString(R.string.dns_label, appSettings.xrayDns())
         );
         ((TextView) findViewById(R.id.setting_mtu)).setText(
             getString(R.string.mtu_label, appSettings.mtu())
@@ -1210,12 +1501,53 @@ public final class MainActivity extends Activity {
         );
     }
 
+    private void toggleSecurity() {
+        securityExpanded = !securityExpanded;
+        setViewsVisible(securityExpanded, R.id.setting_app_lock);
+        ((TextView) findViewById(R.id.security_header)).setText(
+            securityExpanded ? R.string.security_expanded : R.string.security_collapsed
+        );
+    }
+
+    private void requestAppUnlockIfNeeded() {
+        if (!appSettings.appLock() || appUnlocked || unlockRequested) {
+            return;
+        }
+        KeyguardManager keyguard = getSystemService(KeyguardManager.class);
+        if (keyguard == null || !keyguard.isDeviceSecure()) {
+            appSettings.setAppLock(false);
+            return;
+        }
+        Intent unlock = keyguard.createConfirmDeviceCredentialIntent(
+            getString(R.string.app_name),
+            getString(R.string.unlock_h2ray)
+        );
+        if (unlock == null) {
+            appSettings.setAppLock(false);
+            return;
+        }
+        unlockRequested = true;
+        startActivityForResult(unlock, APP_UNLOCK_REQUEST);
+    }
+
     private void chooseDns() {
-        String[] values = {"1.1.1.1", "8.8.8.8", "9.9.9.9"};
+        String[] labels = {
+            "Cloudflare UDP — 1.1.1.1",
+            "Cloudflare DoH — через туннель",
+            "Google DoH — через туннель",
+            "Quad9 DoH — через туннель"
+        };
+        String[] androidDns = {"1.1.1.1", "1.1.1.1", "8.8.8.8", "9.9.9.9"};
+        String[] xrayDns = {
+            "1.1.1.1",
+            "https://1.1.1.1/dns-query",
+            "https://dns.google/dns-query",
+            "https://dns.quad9.net/dns-query"
+        };
         new AlertDialog.Builder(this)
             .setTitle("DNS")
-            .setItems(values, (dialog, which) -> {
-                appSettings.setDns(values[which]);
+            .setItems(labels, (dialog, which) -> {
+                appSettings.setDns(androidDns[which], xrayDns[which]);
                 renderSettings();
                 settingsChanged();
             })
@@ -1262,6 +1594,10 @@ public final class MainActivity extends Activity {
             settingsChanged();
         });
         findViewById(R.id.rule_mode).setOnClickListener(view -> chooseRoutingMode());
+        findViewById(R.id.rule_custom_domains).setOnClickListener(
+            view -> editCustomRoutingRules()
+        );
+        findViewById(R.id.rule_apps).setOnClickListener(view -> chooseBypassApps());
         findViewById(R.id.routing_header).setOnClickListener(view -> {
             routingExpanded = !routingExpanded;
             setViewsVisible(routingExpanded,
@@ -1271,6 +1607,8 @@ public final class MainActivity extends Activity {
                 R.id.rule_block_ads,
                 R.id.rule_block_quic,
                 R.id.rule_sniffing,
+                R.id.rule_custom_domains,
+                R.id.rule_apps,
                 R.id.rules_restart_note);
             ((TextView) findViewById(R.id.routing_header)).setText(
                 routingExpanded ? R.string.routing_expanded : R.string.routing_collapsed
@@ -1288,7 +1626,13 @@ public final class MainActivity extends Activity {
         String mode = appSettings.routingMode();
         int label = "global".equals(mode)
             ? R.string.routing_global
-            : "direct".equals(mode) ? R.string.routing_direct : R.string.routing_rules;
+            : "direct".equals(mode)
+                ? R.string.routing_direct
+                : "proxy_only".equals(mode)
+                    ? R.string.routing_proxy_only
+                    : "exclusions".equals(mode)
+                        ? R.string.routing_exclusions
+                        : R.string.routing_rules;
         ((TextView) findViewById(R.id.rule_mode)).setText(
             getString(R.string.routing_mode_label, getString(label))
         );
@@ -1298,14 +1642,72 @@ public final class MainActivity extends Activity {
         String[] labels = {
             getString(R.string.routing_global),
             getString(R.string.routing_rules),
+            getString(R.string.routing_proxy_only),
+            getString(R.string.routing_exclusions),
             getString(R.string.routing_direct)
         };
-        String[] values = {"global", "rules", "direct"};
+        String[] values = {"global", "rules", "proxy_only", "exclusions", "direct"};
         new AlertDialog.Builder(this)
             .setTitle(R.string.rules_title)
             .setItems(labels, (dialog, which) -> {
                 appSettings.setRoutingMode(values[which]);
                 renderRules();
+                settingsChanged();
+            })
+            .show();
+    }
+
+    private void editCustomRoutingRules() {
+        EditText input = new EditText(this);
+        input.setHint(R.string.custom_domains_hint);
+        input.setMinLines(7);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        input.setText(appSettings.customDomains());
+        input.setPadding(dp(24), dp(12), dp(24), dp(12));
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.custom_domains)
+            .setView(input)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                appSettings.setCustomDomains(input.getText().toString().trim());
+                settingsChanged();
+            })
+            .show();
+    }
+
+    private void chooseBypassApps() {
+        Intent launcher = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+        List<ResolveInfo> resolved = getPackageManager().queryIntentActivities(launcher, 0);
+        resolved.sort(Comparator.comparing(item ->
+            item.loadLabel(getPackageManager()).toString().toLowerCase(Locale.ROOT)));
+        List<ResolveInfo> apps = new ArrayList<>();
+        for (ResolveInfo item : resolved) {
+            if (item.activityInfo != null
+                && !getPackageName().equals(item.activityInfo.packageName)) {
+                apps.add(item);
+            }
+        }
+        String[] labels = new String[apps.size()];
+        boolean[] checked = new boolean[apps.size()];
+        Set<String> selected = new LinkedHashSet<>(appSettings.bypassApps());
+        for (int index = 0; index < apps.size(); index++) {
+            ResolveInfo item = apps.get(index);
+            labels[index] = item.loadLabel(getPackageManager()).toString();
+            checked[index] = selected.contains(item.activityInfo.packageName);
+        }
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.bypass_apps)
+            .setMultiChoiceItems(labels, checked, (dialog, which, enabled) -> {
+                String packageName = apps.get(which).activityInfo.packageName;
+                if (enabled) {
+                    selected.add(packageName);
+                } else {
+                    selected.remove(packageName);
+                }
+            })
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                appSettings.setBypassApps(selected);
                 settingsChanged();
             })
             .show();
