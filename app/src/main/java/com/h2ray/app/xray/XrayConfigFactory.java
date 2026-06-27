@@ -4,6 +4,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.Locale;
+
 public final class XrayConfigFactory {
     private XrayConfigFactory() {
     }
@@ -72,16 +74,36 @@ public final class XrayConfigFactory {
             return;
         }
 
-        String network = stream.optString("network", "");
-        if ("tcp".equalsIgnoreCase(network)) {
-            stream.put("network", "raw");
-        }
+        String network = normalizeNetwork(stream.optString("network", "raw"));
+        stream.put("network", network);
 
         String security = stream.optString("security", "none");
         if ("reality".equalsIgnoreCase(security)) {
             setDefaultFingerprint(stream, "realitySettings");
+            if (!"raw".equals(network) && !"xhttp".equals(network) && !"grpc".equals(network)) {
+                throw new JSONException("REALITY поддерживает только RAW, XHTTP и gRPC");
+            }
         } else if ("tls".equalsIgnoreCase(security)) {
             setDefaultFingerprint(stream, "tlsSettings");
+            JSONObject tls = stream.getJSONObject("tlsSettings");
+            tls.remove("allowInsecure");
+            tls.remove("verifyPeerCertInNames");
+            tls.remove("echForceQuery");
+        }
+    }
+
+    private static String normalizeNetwork(String network) {
+        switch (network.toLowerCase(Locale.ROOT)) {
+            case "tcp":
+                return "raw";
+            case "ws":
+                return "websocket";
+            case "kcp":
+                return "mkcp";
+            case "splithttp":
+                return "xhttp";
+            default:
+                return network.toLowerCase(Locale.ROOT);
         }
     }
 

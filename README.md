@@ -21,7 +21,7 @@ Release APK на текущем этапе не подписывается produ
 
 ## Текущее состояние
 
-GitHub Actions собирает официальный `XTLS/libXray` и встраивает Xray-core в APK. Приложение:
+GitHub Actions собирает официальный `XTLS/libXray` с Xray-core `v26.6.22` и встраивает его в APK. Приложение:
 
 - импортирует `vless://`, `vmess://`, `trojan://`, `ss://` и Xray JSON;
 - создаёт Android TUN через `VpnService`;
