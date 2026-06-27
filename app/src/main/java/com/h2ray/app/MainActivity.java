@@ -61,6 +61,7 @@ import java.io.File;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -384,7 +385,7 @@ public final class MainActivity extends Activity {
 
     private void scanQrCode() {
         new IntentIntegrator(this)
-            .setDesiredBarcodeFormats(IntentIntegrator.QR_CODE_TYPES)
+            .setDesiredBarcodeFormats(Collections.singleton("QR_CODE"))
             .setPrompt(getString(R.string.qr_prompt))
             .setBeepEnabled(false)
             .setOrientationLocked(false)
