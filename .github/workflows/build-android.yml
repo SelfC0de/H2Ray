@@ -82,4 +82,4 @@ jobs:
           name: h2ray-${{ inputs.build_type }}-${{ github.run_number }}
           path: app/build/outputs/apk/${{ inputs.build_type }}/*.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
