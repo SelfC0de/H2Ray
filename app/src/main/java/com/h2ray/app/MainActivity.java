@@ -70,6 +70,7 @@ public final class MainActivity extends Activity {
     private static final int VPN_PERMISSION_REQUEST = 100;
     private static final int NOTIFICATION_PERMISSION_REQUEST = 101;
     private static final int FILE_IMPORT_REQUEST = 102;
+    private static final int CAMERA_PERMISSION_REQUEST = 103;
     private static final int MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -384,12 +385,54 @@ public final class MainActivity extends Activity {
     }
 
     private void scanQrCode() {
-        new IntentIntegrator(this)
-            .setDesiredBarcodeFormats(Collections.singleton("QR_CODE"))
-            .setPrompt(getString(R.string.qr_prompt))
-            .setBeepEnabled(false)
-            .setOrientationLocked(false)
-            .initiateScan();
+        if (checkSelfPermission(Manifest.permission.CAMERA)
+            != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                new String[] {Manifest.permission.CAMERA},
+                CAMERA_PERMISSION_REQUEST
+            );
+            return;
+        }
+        launchQrScanner();
+    }
+
+    private void launchQrScanner() {
+        try {
+            new IntentIntegrator(this)
+                .setDesiredBarcodeFormats(Collections.singleton("QR_CODE"))
+                .setPrompt(getString(R.string.qr_prompt))
+                .setBeepEnabled(false)
+                .setOrientationLocked(false)
+                .initiateScan();
+        } catch (RuntimeException error) {
+            Toast.makeText(
+                this,
+                R.string.qr_scanner_unavailable,
+                Toast.LENGTH_LONG
+            ).show();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+        int requestCode,
+        String[] permissions,
+        int[] grantResults
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != CAMERA_PERMISSION_REQUEST) {
+            return;
+        }
+        if (grantResults.length > 0
+            && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            launchQrScanner();
+        } else {
+            Toast.makeText(
+                this,
+                R.string.camera_permission_required,
+                Toast.LENGTH_LONG
+            ).show();
+        }
     }
 
     private void importDocument(Uri uri) {

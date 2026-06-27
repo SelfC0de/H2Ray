@@ -92,4 +92,6 @@
     <string name="profiles_imported">Импортировано профилей: %1$d</string>
     <string name="qr_prompt">Наведите камеру на QR-код подключения</string>
     <string name="qr_cancelled">Сканирование отменено</string>
+    <string name="camera_permission_required">Для сканирования QR-кода разрешите доступ к камере</string>
+    <string name="qr_scanner_unavailable">Не удалось запустить сканер QR-кода</string>
 </resources>
