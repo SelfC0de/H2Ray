@@ -31,4 +31,5 @@
     <string name="rules_next_stage">Редактор правил будет добавлен на следующем этапе</string>
     <string name="settings_next_stage">Настройки будут добавлены на следующем этапе</string>
     <string name="app_information">H2Ray\nPackage: com.h2ray.app\nCore: XTLS/libXray</string>
+    <string name="connection_error_details">Ошибка Xray-core</string>
 </resources>

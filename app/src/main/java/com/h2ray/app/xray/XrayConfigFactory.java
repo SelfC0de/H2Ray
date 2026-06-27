@@ -18,6 +18,7 @@ public final class XrayConfigFactory {
         JSONObject proxy = outbounds.getJSONObject(0);
         proxy.remove("sendThrough");
         proxy.put("tag", "proxy");
+        normalizeStreamSettings(proxy);
 
         JSONArray runtimeOutbounds = new JSONArray().put(proxy);
         runtimeOutbounds.put(new JSONObject()
@@ -63,5 +64,36 @@ public final class XrayConfigFactory {
                     .put("ip", privateNetworks)
                     .put("outboundTag", "direct"))));
         return config.toString();
+    }
+
+    private static void normalizeStreamSettings(JSONObject outbound) throws JSONException {
+        JSONObject stream = outbound.optJSONObject("streamSettings");
+        if (stream == null) {
+            return;
+        }
+
+        String network = stream.optString("network", "");
+        if ("tcp".equalsIgnoreCase(network)) {
+            stream.put("network", "raw");
+        }
+
+        String security = stream.optString("security", "none");
+        if ("reality".equalsIgnoreCase(security)) {
+            setDefaultFingerprint(stream, "realitySettings");
+        } else if ("tls".equalsIgnoreCase(security)) {
+            setDefaultFingerprint(stream, "tlsSettings");
+        }
+    }
+
+    private static void setDefaultFingerprint(JSONObject stream, String settingsName)
+        throws JSONException {
+        JSONObject securitySettings = stream.optJSONObject(settingsName);
+        if (securitySettings == null) {
+            securitySettings = new JSONObject();
+            stream.put(settingsName, securitySettings);
+        }
+        if (securitySettings.optString("fingerprint", "").trim().isEmpty()) {
+            securitySettings.put("fingerprint", "chrome");
+        }
     }
 }

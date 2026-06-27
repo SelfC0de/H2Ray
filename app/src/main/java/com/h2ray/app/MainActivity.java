@@ -68,6 +68,7 @@ public final class MainActivity extends Activity {
 
         connectButton.setOnClickListener(view -> toggleConnection());
         importButton.setOnClickListener(view -> showImportDialog());
+        connectionError.setOnClickListener(view -> showConnectionError());
         findViewById(R.id.profile_card).setOnClickListener(view -> showProfileActions());
         findViewById(R.id.header_menu_button).setOnClickListener(view -> showAppMenu());
         findViewById(R.id.nav_home).setOnClickListener(
@@ -229,6 +230,24 @@ public final class MainActivity extends Activity {
         new AlertDialog.Builder(this)
             .setTitle(R.string.app_name)
             .setMessage(R.string.app_information)
+            .setPositiveButton(android.R.string.ok, null)
+            .show();
+    }
+
+    private void showConnectionError() {
+        String error = connectionStatusStore.getError();
+        if (error.trim().isEmpty()) {
+            return;
+        }
+        TextView message = new TextView(this);
+        message.setText(error);
+        message.setTextIsSelectable(true);
+        message.setTextColor(getColor(R.color.text_primary));
+        message.setTextSize(13);
+        message.setPadding(40, 24, 40, 24);
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.connection_error_details)
+            .setView(message)
             .setPositiveButton(android.R.string.ok, null)
             .show();
     }
