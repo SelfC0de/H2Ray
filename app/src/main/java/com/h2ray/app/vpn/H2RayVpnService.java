@@ -6,6 +6,10 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.net.TrafficStats;
 import android.net.VpnService;
 import android.os.Build;
@@ -21,6 +25,7 @@ import com.h2ray.app.data.ConnectionStatusStore;
 import com.h2ray.app.data.LogStore;
 import com.h2ray.app.data.ProfileStore;
 import com.h2ray.app.network.PublicIpResolver;
+import com.h2ray.app.xray.ServerEndpoint;
 import com.h2ray.app.xray.XrayBridge;
 import com.h2ray.app.xray.XrayConfigFactory;
 
@@ -28,6 +33,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -56,6 +63,10 @@ public final class H2RayVpnService extends VpnService {
     private LogStore logStore;
     private volatile boolean preserveFailure;
     private volatile boolean destroyed;
+    private volatile Network underlyingNetwork;
+    private volatile int startAttempt;
+    private ConnectivityManager connectivityManager;
+    private ConnectivityManager.NetworkCallback networkCallback;
 
     public static Intent startIntent(Context context) {
         return new Intent(context, H2RayVpnService.class).setAction(ACTION_START);
@@ -80,15 +91,18 @@ public final class H2RayVpnService extends VpnService {
         connectionStatus = new ConnectionStatusStore(this);
         logStore = new LogStore(this);
         createNotificationChannel();
+        registerNetworkObserver();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? ACTION_START : intent.getAction();
         if (ACTION_STOP.equals(action)) {
+            new AppSettings(this).setDesiredVpnRunning(false);
             requestStop(false);
             return START_NOT_STICKY;
         }
+        new AppSettings(this).setDesiredVpnRunning(true);
 
         CoreState current = CORE_STATE.get();
         if (current == CoreState.STARTING || current == CoreState.RUNNING) {
@@ -99,6 +113,7 @@ public final class H2RayVpnService extends VpnService {
         }
 
         cancelStart.set(false);
+        startAttempt = 0;
         preserveFailure = false;
         connectionStatus.setConnecting();
         logStore.add("INFO", "Запуск VPN");
@@ -108,6 +123,7 @@ public final class H2RayVpnService extends VpnService {
     }
 
     private void startTunnel() {
+        startAttempt++;
         try {
             synchronized (lifecycleLock) {
                 cleanupResources();
@@ -125,6 +141,7 @@ public final class H2RayVpnService extends VpnService {
                 copyCoreAsset("geosite.dat");
                 AppSettings settings = new AppSettings(this);
                 int mtu = settings.mtu();
+                verifyServerReachable(store, settings.connectionTimeoutSeconds());
 
                 Builder builder = new Builder()
                     .setSession(getString(R.string.app_name))
@@ -154,6 +171,7 @@ public final class H2RayVpnService extends VpnService {
                 }
 
                 CORE_STATE.set(CoreState.RUNNING);
+                startAttempt = 0;
                 long rx = safeTrafficValue(TrafficStats.getUidRxBytes(Process.myUid()));
                 long tx = safeTrafficValue(TrafficStats.getUidTxBytes(Process.myUid()));
                 connectionStatus.setRunning(rx, tx);
@@ -164,6 +182,27 @@ public final class H2RayVpnService extends VpnService {
             }
         } catch (Throwable error) {
             Log.e(TAG, "Unable to start tunnel", error);
+            AppSettings settings = new AppSettings(this);
+            if (!cancelStart.get() && settings.desiredVpnRunning()
+                && settings.autoReconnect() && startAttempt < settings.retryCount()) {
+                synchronized (lifecycleLock) {
+                    cleanupResources();
+                }
+                logStore.add(
+                    "WARN",
+                    "Попытка " + startAttempt + " не удалась, повтор подключения"
+                );
+                try {
+                    Thread.sleep(Math.min(5000L, 1000L * startAttempt));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                connectionStatus.setConnecting();
+                CORE_STATE.set(CoreState.STARTING);
+                startTunnel();
+                return;
+            }
             preserveFailure = true;
             CORE_STATE.set(CoreState.ERROR);
             connectionStatus.setError(error);
@@ -226,6 +265,7 @@ public final class H2RayVpnService extends VpnService {
 
     @Override
     public void onRevoke() {
+        new AppSettings(this).setDesiredVpnRunning(false);
         requestStop(true);
         super.onRevoke();
     }
@@ -243,6 +283,12 @@ public final class H2RayVpnService extends VpnService {
         }
         executor.shutdownNow();
         ipExecutor.shutdownNow();
+        if (connectivityManager != null && networkCallback != null) {
+            try {
+                connectivityManager.unregisterNetworkCallback(networkCallback);
+            } catch (RuntimeException ignored) {
+            }
+        }
         super.onDestroy();
     }
 
@@ -253,6 +299,54 @@ public final class H2RayVpnService extends VpnService {
 
     private long safeTrafficValue(long value) {
         return value == TrafficStats.UNSUPPORTED ? 0 : Math.max(0, value);
+    }
+
+    private void verifyServerReachable(ProfileStore store, int timeoutSeconds)
+        throws IOException {
+        ServerEndpoint endpoint = ServerEndpoint.fromConfig(store.getConfig());
+        if (endpoint == null) {
+            return;
+        }
+        try (Socket socket = new Socket()) {
+            socket.connect(
+                new InetSocketAddress(endpoint.address, endpoint.port),
+                timeoutSeconds * 1000
+            );
+        }
+    }
+
+    private void registerNetworkObserver() {
+        connectivityManager = getSystemService(ConnectivityManager.class);
+        if (connectivityManager == null) {
+            return;
+        }
+        networkCallback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                Network previous = underlyingNetwork;
+                underlyingNetwork = network;
+                if (previous == null || previous.equals(network)
+                    || CORE_STATE.get() != CoreState.RUNNING
+                    || !new AppSettings(H2RayVpnService.this).autoReconnect()) {
+                    return;
+                }
+                logStore.add("INFO", "Сеть изменилась, переподключение VPN");
+                if (!CORE_STATE.compareAndSet(CoreState.RUNNING, CoreState.STARTING)) {
+                    return;
+                }
+                connectionStatus.setConnecting();
+                updateNotification(getString(R.string.connecting));
+                startAttempt = 0;
+                executor.execute(H2RayVpnService.this::startTunnel);
+            }
+        };
+        connectivityManager.registerNetworkCallback(
+            new NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                .build(),
+            networkCallback
+        );
     }
 
     private void resolvePublicIp() {

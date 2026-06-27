@@ -50,6 +50,7 @@ import com.h2ray.app.vpn.H2RayVpnService;
 import com.h2ray.app.xray.ServerEndpoint;
 import com.h2ray.app.xray.ProfileImporter;
 import com.h2ray.app.xray.XrayBridge;
+import com.h2ray.app.xray.XrayConfigFactory;
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 
@@ -103,6 +104,12 @@ public final class MainActivity extends Activity {
     private volatile long lastProxyIpAttempt;
     private boolean waitingForInstallPermission;
     private boolean installerLaunched;
+    private boolean profilesExpanded;
+    private boolean profileAutomationExpanded;
+    private boolean routingExpanded;
+    private boolean connectionSettingsExpanded;
+    private boolean diagnosticsExpanded;
+    private boolean updatesExpanded;
 
     private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
         @Override
@@ -176,12 +183,27 @@ public final class MainActivity extends Activity {
         findViewById(R.id.nav_rules).setOnClickListener(view -> showScreen("rules"));
         findViewById(R.id.nav_settings).setOnClickListener(view -> showScreen("settings"));
         findViewById(R.id.add_profile).setOnClickListener(view -> showImportDialog());
-        findViewById(R.id.ping_profiles).setOnClickListener(view -> pingProfiles());
+        findViewById(R.id.ping_profiles).setOnClickListener(view -> pingProfiles(false));
+        findViewById(R.id.profiles_title).setOnClickListener(
+            view -> toggleProfilesSection()
+        );
+        findViewById(R.id.profile_automation_header).setOnClickListener(
+            view -> toggleProfileAutomation()
+        );
+        findViewById(R.id.select_fastest_profile).setOnClickListener(
+            view -> pingProfiles(true)
+        );
+        findViewById(R.id.check_profile_compatibility).setOnClickListener(
+            view -> checkProfileCompatibility()
+        );
         findViewById(R.id.profiles_menu_button).setOnClickListener(
             view -> showProfilesMenu()
         );
         findViewById(R.id.open_logs).setOnClickListener(
             view -> startActivity(new Intent(this, LogsActivity.class))
+        );
+        findViewById(R.id.copy_diagnostic_report).setOnClickListener(
+            view -> copyDiagnosticReport()
         );
         updateBadge.setOnClickListener(view -> openAvailableUpdate());
         updateButton.setOnClickListener(view -> handleUpdateButton());
@@ -399,10 +421,13 @@ public final class MainActivity extends Activity {
     private void launchQrScanner() {
         try {
             new IntentIntegrator(this)
+                .setCaptureActivity(QrCaptureActivity.class)
                 .setDesiredBarcodeFormats(Collections.singleton("QR_CODE"))
                 .setPrompt(getString(R.string.qr_prompt))
                 .setBeepEnabled(false)
-                .setOrientationLocked(false)
+                .setOrientationLocked(true)
+                .addExtra("SCAN_WIDTH", dp(280))
+                .addExtra("SCAN_HEIGHT", dp(280))
                 .initiateScan();
         } catch (RuntimeException error) {
             Toast.makeText(
@@ -901,7 +926,10 @@ public final class MainActivity extends Activity {
         profilesList.removeAllViews();
         List<ProfileStore.Profile> profiles = profileStore.getProfiles();
         ((TextView) findViewById(R.id.profiles_title)).setText(
-            getString(R.string.profiles_count, profiles.size())
+            getString(
+                profilesExpanded ? R.string.profiles_expanded : R.string.profiles_collapsed,
+                profiles.size()
+            )
         );
         ProfileStore.Profile active = profileStore.getActiveProfile();
         if (profiles.isEmpty()) {
@@ -961,20 +989,100 @@ public final class MainActivity extends Activity {
             .show();
     }
 
-    private void pingProfiles() {
+    private void pingProfiles(boolean selectFastest) {
         if (H2RayVpnService.isRunning()) {
             Toast.makeText(this, R.string.ping_requires_disconnect, Toast.LENGTH_LONG).show();
             return;
         }
-        ProfileStore.Profile profile = profileStore.getActiveProfile();
-        if (profile == null) {
+        List<ProfileStore.Profile> profiles = profileStore.getProfiles();
+        if (profiles.isEmpty()) {
             return;
         }
-        profileStore.updatePing(profile.id, -2);
+        for (ProfileStore.Profile profile : profiles) {
+            profileStore.updatePing(profile.id, -2);
+        }
         renderProfiles();
         executor.execute(() -> {
-            profileStore.updatePing(profile.id, measurePing(profile));
-            runOnUiThread(this::renderProfiles);
+            ProfileStore.Profile fastest = null;
+            long fastestPing = Long.MAX_VALUE;
+            for (ProfileStore.Profile profile : profiles) {
+                long ping = measurePing(profile);
+                profileStore.updatePing(profile.id, ping);
+                if (ping < fastestPing) {
+                    fastest = profile;
+                    fastestPing = ping;
+                }
+                runOnUiThread(this::renderProfiles);
+            }
+            ProfileStore.Profile selected = fastest;
+            long selectedPing = fastestPing;
+            runOnUiThread(() -> {
+                if (!selectFastest) {
+                    return;
+                }
+                if (selected == null || selectedPing == Long.MAX_VALUE) {
+                    Toast.makeText(
+                        this,
+                        R.string.no_available_servers,
+                        Toast.LENGTH_LONG
+                    ).show();
+                    return;
+                }
+                profileStore.select(selected.id);
+                render();
+                renderProfiles();
+                Toast.makeText(
+                    this,
+                    getString(R.string.fastest_selected, selected.name, selectedPing),
+                    Toast.LENGTH_LONG
+                ).show();
+            });
+        });
+    }
+
+    private void toggleProfilesSection() {
+        profilesExpanded = !profilesExpanded;
+        findViewById(R.id.profiles_list_scroll).setVisibility(
+            profilesExpanded ? View.VISIBLE : View.GONE
+        );
+        findViewById(R.id.add_profile).setVisibility(
+            profilesExpanded ? View.VISIBLE : View.GONE
+        );
+        findViewById(R.id.ping_profiles).setVisibility(
+            profilesExpanded ? View.VISIBLE : View.GONE
+        );
+        renderProfiles();
+    }
+
+    private void toggleProfileAutomation() {
+        profileAutomationExpanded = !profileAutomationExpanded;
+        findViewById(R.id.profile_automation_panel).setVisibility(
+            profileAutomationExpanded ? View.VISIBLE : View.GONE
+        );
+        ((TextView) findViewById(R.id.profile_automation_header)).setText(
+            profileAutomationExpanded
+                ? R.string.profile_automation_expanded
+                : R.string.profile_automation_collapsed
+        );
+    }
+
+    private void checkProfileCompatibility() {
+        ProfileStore.Profile profile = profileStore.getActiveProfile();
+        if (profile == null) {
+            Toast.makeText(this, R.string.no_profile, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        executor.execute(() -> {
+            try {
+                XrayConfigFactory.createRuntimeConfig(profile.config, appSettings);
+                runOnUiThread(() -> Toast.makeText(
+                    this,
+                    getString(R.string.compatibility_ok, XrayBridge.version()),
+                    Toast.LENGTH_LONG
+                ).show());
+            } catch (Exception error) {
+                runOnUiThread(() -> inputError(error.getMessage()));
+            }
         });
     }
 
@@ -996,22 +1104,109 @@ public final class MainActivity extends Activity {
 
     private void configureSettings() {
         Switch ipv6 = findViewById(R.id.setting_ipv6);
+        Switch autoReconnect = findViewById(R.id.setting_auto_reconnect);
+        Switch restoreBoot = findViewById(R.id.setting_restore_boot);
         ipv6.setOnCheckedChangeListener((button, value) -> {
             appSettings.setIpv6(value);
             settingsChanged();
         });
+        autoReconnect.setOnCheckedChangeListener((button, value) ->
+            appSettings.setAutoReconnect(value));
+        restoreBoot.setOnCheckedChangeListener((button, value) ->
+            appSettings.setRestoreAfterBoot(value));
         findViewById(R.id.setting_dns).setOnClickListener(view -> chooseDns());
         findViewById(R.id.setting_mtu).setOnClickListener(view -> chooseMtu());
+        findViewById(R.id.setting_retry_policy).setOnClickListener(
+            view -> chooseRetryPolicy()
+        );
+        findViewById(R.id.connection_settings_header).setOnClickListener(
+            view -> toggleConnectionSettings()
+        );
+        findViewById(R.id.diagnostics_header).setOnClickListener(
+            view -> toggleDiagnostics()
+        );
+        findViewById(R.id.updates_header).setOnClickListener(
+            view -> toggleUpdates()
+        );
         renderSettings();
     }
 
     private void renderSettings() {
         ((Switch) findViewById(R.id.setting_ipv6)).setChecked(appSettings.ipv6());
+        ((Switch) findViewById(R.id.setting_auto_reconnect)).setChecked(
+            appSettings.autoReconnect()
+        );
+        ((Switch) findViewById(R.id.setting_restore_boot)).setChecked(
+            appSettings.restoreAfterBoot()
+        );
         ((TextView) findViewById(R.id.setting_dns)).setText(
             getString(R.string.dns_label, appSettings.dns())
         );
         ((TextView) findViewById(R.id.setting_mtu)).setText(
             getString(R.string.mtu_label, appSettings.mtu())
+        );
+        ((TextView) findViewById(R.id.setting_retry_policy)).setText(
+            getString(
+                R.string.retry_policy,
+                appSettings.retryCount(),
+                appSettings.connectionTimeoutSeconds()
+            )
+        );
+    }
+
+    private void chooseRetryPolicy() {
+        String[] labels = {
+            "Быстро: 2 попытки, 5 сек.",
+            "Обычно: 3 попытки, 8 сек.",
+            "Медленная сеть: 5 попыток, 15 сек."
+        };
+        int[] attempts = {2, 3, 5};
+        int[] timeouts = {5, 8, 15};
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.retry_policy_title)
+            .setItems(labels, (dialog, which) -> {
+                appSettings.setRetryCount(attempts[which]);
+                appSettings.setConnectionTimeoutSeconds(timeouts[which]);
+                renderSettings();
+            })
+            .show();
+    }
+
+    private void toggleConnectionSettings() {
+        connectionSettingsExpanded = !connectionSettingsExpanded;
+        setViewsVisible(connectionSettingsExpanded,
+            R.id.setting_ipv6,
+            R.id.setting_dns,
+            R.id.setting_mtu,
+            R.id.setting_auto_reconnect,
+            R.id.setting_restore_boot,
+            R.id.setting_retry_policy);
+        ((TextView) findViewById(R.id.connection_settings_header)).setText(
+            connectionSettingsExpanded
+                ? R.string.connection_expanded
+                : R.string.connection_collapsed
+        );
+    }
+
+    private void toggleDiagnostics() {
+        diagnosticsExpanded = !diagnosticsExpanded;
+        setViewsVisible(
+            diagnosticsExpanded,
+            R.id.open_logs,
+            R.id.copy_diagnostic_report
+        );
+        ((TextView) findViewById(R.id.diagnostics_header)).setText(
+            diagnosticsExpanded
+                ? R.string.diagnostics_expanded
+                : R.string.diagnostics_collapsed
+        );
+    }
+
+    private void toggleUpdates() {
+        updatesExpanded = !updatesExpanded;
+        setViewsVisible(updatesExpanded, R.id.update_app);
+        ((TextView) findViewById(R.id.updates_header)).setText(
+            updatesExpanded ? R.string.updates_expanded : R.string.updates_collapsed
         );
     }
 
@@ -1067,6 +1262,20 @@ public final class MainActivity extends Activity {
             settingsChanged();
         });
         findViewById(R.id.rule_mode).setOnClickListener(view -> chooseRoutingMode());
+        findViewById(R.id.routing_header).setOnClickListener(view -> {
+            routingExpanded = !routingExpanded;
+            setViewsVisible(routingExpanded,
+                R.id.rule_mode,
+                R.id.rule_bypass_ru,
+                R.id.rule_bypass_private,
+                R.id.rule_block_ads,
+                R.id.rule_block_quic,
+                R.id.rule_sniffing,
+                R.id.rules_restart_note);
+            ((TextView) findViewById(R.id.routing_header)).setText(
+                routingExpanded ? R.string.routing_expanded : R.string.routing_collapsed
+            );
+        });
         renderRules();
     }
 
@@ -1106,6 +1315,51 @@ public final class MainActivity extends Activity {
         if (H2RayVpnService.isRunning()) {
             Toast.makeText(this, R.string.reconnect_settings, Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void setViewsVisible(boolean visible, int... ids) {
+        for (int id : ids) {
+            findViewById(id).setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private void copyDiagnosticReport() {
+        ProfileStore.Profile profile = profileStore.getActiveProfile();
+        String report = "H2Ray " + currentVersion()
+            + "\nAndroid API: " + Build.VERSION.SDK_INT
+            + "\nXray-core: " + XrayBridge.version()
+            + "\nСостояние: " + connectionStatusStore.getState()
+            + "\nПротокол: " + (profile == null ? "—" : profile.protocol)
+            + "\nIPv6: " + appSettings.ipv6()
+            + "\nDNS: " + appSettings.dns()
+            + "\nМаршрутизация: " + appSettings.routingMode()
+            + "\nАвтопереподключение: " + appSettings.autoReconnect()
+            + "\nОшибка: " + redactDiagnostic(connectionStatusStore.getError());
+        ClipboardManager clipboard =
+            (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard != null) {
+            clipboard.setPrimaryClip(ClipData.newPlainText("H2Ray diagnostics", report));
+        }
+        Toast.makeText(
+            this,
+            R.string.diagnostic_report_copied,
+            Toast.LENGTH_SHORT
+        ).show();
+    }
+
+    private String redactDiagnostic(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return "—";
+        }
+        return value
+            .replaceAll(
+                "(?i)(uuid|id|password|publicKey|shortId|email)[\"'=:\\\\s]+[^,\\\\s}\"]+",
+                "$1=<скрыто>"
+            )
+            .replaceAll(
+                "[0-9a-fA-F]{8}-[0-9a-fA-F-]{27,}",
+                "<UUID скрыт>"
+            );
     }
 
     private int dp(int value) {

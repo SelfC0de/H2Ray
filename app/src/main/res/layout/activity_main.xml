@@ -302,7 +302,8 @@
                 android:layout_height="42dp"
                 android:text="@string/check_ping"
                 android:textAllCaps="false"
-                android:textSize="12sp" />
+                android:textSize="12sp"
+                android:visibility="gone" />
             <TextView
                 android:id="@+id/profiles_menu_button"
                 android:layout_width="42dp"
@@ -316,10 +317,51 @@
                 android:textSize="16sp" />
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/profile_automation_header"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="@drawable/bg_card"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="@string/profile_automation_collapsed"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/profile_automation_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/select_fastest_profile"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:text="@string/select_fastest"
+                android:textAllCaps="false" />
+
+            <Button
+                android:id="@+id/check_profile_compatibility"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:text="@string/check_compatibility"
+                android:textAllCaps="false" />
+        </LinearLayout>
+
         <ScrollView
+            android:id="@+id/profiles_list_scroll"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1">
+            android:layout_weight="1"
+            android:visibility="gone">
             <LinearLayout
                 android:id="@+id/profiles_list"
                 android:layout_width="match_parent"
@@ -332,7 +374,8 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:text="@string/add_profile"
-            android:textAllCaps="false" />
+            android:textAllCaps="false"
+            android:visibility="gone" />
     </LinearLayout>
 
     <ScrollView
@@ -361,6 +404,21 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/routing_header"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/routing_collapsed"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
                 android:id="@+id/rule_mode"
                 android:layout_width="match_parent"
                 android:layout_height="64dp"
@@ -371,7 +429,8 @@
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:visibility="gone" />
 
             <Switch
                 android:id="@+id/rule_bypass_ru"
@@ -383,7 +442,8 @@
                 android:paddingEnd="14dp"
                 android:text="@string/bypass_ru"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:visibility="gone" />
 
             <Switch
                 android:id="@+id/rule_bypass_private"
@@ -395,7 +455,8 @@
                 android:paddingEnd="14dp"
                 android:text="@string/bypass_private"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:visibility="gone" />
 
             <Switch
                 android:id="@+id/rule_block_ads"
@@ -407,7 +468,8 @@
                 android:paddingEnd="14dp"
                 android:text="@string/block_ads"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:visibility="gone" />
 
             <Switch
                 android:id="@+id/rule_block_quic"
@@ -419,7 +481,8 @@
                 android:paddingEnd="14dp"
                 android:text="@string/block_quic"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:visibility="gone" />
 
             <Switch
                 android:id="@+id/rule_sniffing"
@@ -431,15 +494,18 @@
                 android:paddingEnd="14dp"
                 android:text="@string/domain_sniffing"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:visibility="gone" />
 
             <TextView
+                android:id="@+id/rules_restart_note"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:text="@string/rules_restart_note"
                 android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
+                android:textSize="12sp"
+                android:visibility="gone" />
         </LinearLayout>
     </ScrollView>
 
@@ -469,12 +535,19 @@
                 android:textStyle="bold" />
 
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:id="@+id/connection_settings_header"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
                 android:layout_marginBottom="8dp"
-                android:text="@string/connection_section"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp"
+                android:background="@drawable/bg_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/connection_collapsed"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <Switch
@@ -487,7 +560,8 @@
                 android:paddingEnd="14dp"
                 android:text="@string/enable_ipv6"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/setting_dns"
@@ -501,7 +575,8 @@
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/setting_mtu"
@@ -515,16 +590,65 @@
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <Switch
+                android:id="@+id/setting_auto_reconnect"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/auto_reconnect"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <Switch
+                android:id="@+id/setting_restore_boot"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/restore_after_boot"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:visibility="gone" />
 
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:id="@+id/setting_retry_policy"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/diagnostics_header"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
                 android:layout_marginTop="22dp"
                 android:layout_marginBottom="8dp"
-                android:text="@string/diagnostics_section"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp"
+                android:background="@drawable/bg_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/diagnostics_collapsed"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -539,16 +663,40 @@
                 android:paddingEnd="14dp"
                 android:text="@string/connection_logs"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:visibility="gone" />
 
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:id="@+id/copy_diagnostic_report"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/copy_diagnostic_report"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/updates_header"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
                 android:layout_marginTop="22dp"
                 android:layout_marginBottom="8dp"
-                android:text="@string/updates_section"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp"
+                android:background="@drawable/bg_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/updates_collapsed"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <Button
@@ -559,7 +707,8 @@
                 android:text="@string/update_app"
                 android:textAllCaps="false"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:visibility="gone" />
         </LinearLayout>
     </ScrollView>
 

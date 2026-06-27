@@ -84,6 +84,49 @@ public final class AppSettings {
         preferences.edit().putBoolean("sniffing", value).apply();
     }
 
+    public boolean autoReconnect() {
+        return preferences.getBoolean("auto_reconnect", true);
+    }
+
+    public void setAutoReconnect(boolean value) {
+        preferences.edit().putBoolean("auto_reconnect", value).apply();
+    }
+
+    public boolean restoreAfterBoot() {
+        return preferences.getBoolean("restore_after_boot", true);
+    }
+
+    public void setRestoreAfterBoot(boolean value) {
+        preferences.edit().putBoolean("restore_after_boot", value).apply();
+    }
+
+    public int retryCount() {
+        return preferences.getInt("retry_count", 3);
+    }
+
+    public void setRetryCount(int value) {
+        preferences.edit().putInt("retry_count", Math.max(1, Math.min(5, value))).apply();
+    }
+
+    public int connectionTimeoutSeconds() {
+        return preferences.getInt("connection_timeout", 8);
+    }
+
+    public void setConnectionTimeoutSeconds(int value) {
+        preferences.edit().putInt(
+            "connection_timeout",
+            Math.max(3, Math.min(30, value))
+        ).apply();
+    }
+
+    public boolean desiredVpnRunning() {
+        return preferences.getBoolean("desired_vpn_running", false);
+    }
+
+    public void setDesiredVpnRunning(boolean value) {
+        preferences.edit().putBoolean("desired_vpn_running", value).commit();
+    }
+
     private void migrateSecureDefaults() {
         if (preferences.getBoolean("secure_defaults_v2", false)) {
             return;

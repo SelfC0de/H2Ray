@@ -94,4 +94,27 @@
     <string name="qr_cancelled">Сканирование отменено</string>
     <string name="camera_permission_required">Для сканирования QR-кода разрешите доступ к камере</string>
     <string name="qr_scanner_unavailable">Не удалось запустить сканер QR-кода</string>
+    <string name="profile_automation_collapsed">Автоматизация для новичков  ▾</string>
+    <string name="profile_automation_expanded">Автоматизация для новичков  ▴</string>
+    <string name="profiles_collapsed">Серверы (%1$d)  ▾</string>
+    <string name="profiles_expanded">Серверы (%1$d)  ▴</string>
+    <string name="select_fastest">Проверить все и выбрать быстрый</string>
+    <string name="check_compatibility">Проверить активную конфигурацию</string>
+    <string name="compatibility_ok">Конфигурация совместима с Xray-core %1$s</string>
+    <string name="no_available_servers">Доступные серверы не найдены</string>
+    <string name="fastest_selected">Выбран сервер: %1$s (%2$d мс)</string>
+    <string name="routing_collapsed">Маршрутизация и фильтрация  ▾</string>
+    <string name="routing_expanded">Маршрутизация и фильтрация  ▴</string>
+    <string name="connection_collapsed">Подключение и надёжность  ▾</string>
+    <string name="connection_expanded">Подключение и надёжность  ▴</string>
+    <string name="diagnostics_collapsed">Диагностика  ▾</string>
+    <string name="diagnostics_expanded">Диагностика  ▴</string>
+    <string name="updates_collapsed">Обновления  ▾</string>
+    <string name="updates_expanded">Обновления  ▴</string>
+    <string name="auto_reconnect">Переподключаться при смене сети</string>
+    <string name="restore_after_boot">Восстанавливать VPN после перезагрузки</string>
+    <string name="retry_policy">Попыток: %1$d · тайм-аут: %2$d сек.</string>
+    <string name="retry_policy_title">Повторное подключение</string>
+    <string name="copy_diagnostic_report">Копировать обезличенный отчёт</string>
+    <string name="diagnostic_report_copied">Диагностический отчёт скопирован</string>
 </resources>
