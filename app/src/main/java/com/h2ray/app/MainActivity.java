@@ -13,6 +13,7 @@ import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
+import android.database.Cursor;
 import android.net.Uri;
 import android.net.VpnService;
 import android.net.TrafficStats;
@@ -23,6 +24,7 @@ import android.os.Looper;
 import android.os.Process;
 import android.os.SystemClock;
 import android.provider.Settings;
+import android.provider.OpenableColumns;
 import android.text.InputType;
 import android.text.Spannable;
 import android.text.SpannableString;
@@ -46,13 +48,19 @@ import com.h2ray.app.network.UpdateChecker;
 import com.h2ray.app.update.UpdateDownloadManager;
 import com.h2ray.app.vpn.H2RayVpnService;
 import com.h2ray.app.xray.ServerEndpoint;
+import com.h2ray.app.xray.ProfileImporter;
 import com.h2ray.app.xray.XrayBridge;
+import com.google.zxing.integration.android.IntentIntegrator;
+import com.google.zxing.integration.android.IntentResult;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.io.File;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -60,6 +68,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class MainActivity extends Activity {
     private static final int VPN_PERMISSION_REQUEST = 100;
     private static final int NOTIFICATION_PERMISSION_REQUEST = 101;
+    private static final int FILE_IMPORT_REQUEST = 102;
+    private static final int MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -165,6 +175,9 @@ public final class MainActivity extends Activity {
         findViewById(R.id.nav_settings).setOnClickListener(view -> showScreen("settings"));
         findViewById(R.id.add_profile).setOnClickListener(view -> showImportDialog());
         findViewById(R.id.ping_profiles).setOnClickListener(view -> pingProfiles());
+        findViewById(R.id.profiles_menu_button).setOnClickListener(
+            view -> showProfilesMenu()
+        );
         findViewById(R.id.open_logs).setOnClickListener(
             view -> startActivity(new Intent(this, LogsActivity.class))
         );
@@ -243,6 +256,24 @@ public final class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        IntentResult qrResult = IntentIntegrator.parseActivityResult(
+            requestCode,
+            resultCode,
+            data
+        );
+        if (qrResult != null) {
+            if (qrResult.getContents() == null) {
+                Toast.makeText(this, R.string.qr_cancelled, Toast.LENGTH_SHORT).show();
+            } else {
+                importExternalContent(qrResult.getContents(), "QR");
+            }
+            return;
+        }
+        if (requestCode == FILE_IMPORT_REQUEST && resultCode == RESULT_OK
+            && data != null && data.getData() != null) {
+            importDocument(data.getData());
+            return;
+        }
         if (requestCode == VPN_PERMISSION_REQUEST && resultCode == RESULT_OK) {
             startVpn();
         }
@@ -299,15 +330,18 @@ public final class MainActivity extends Activity {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
         executor.execute(() -> {
             try {
-                String config = XrayBridge.parseShareText(trimmed);
-                String name = XrayBridge.detectName(trimmed);
-                String protocol = XrayBridge.detectProtocol(config);
-                profileStore.saveActiveProfile(name, protocol, config, trimmed);
+                List<ProfileImporter.ProfileData> profiles =
+                    ProfileImporter.importContent(trimmed, "JSON profile");
+                saveImportedProfiles(profiles);
                 runOnUiThread(() -> {
                     dialog.dismiss();
                     render();
                     renderProfiles();
-                    Toast.makeText(this, R.string.profile_imported, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(
+                        this,
+                        getString(R.string.profiles_imported, profiles.size()),
+                        Toast.LENGTH_SHORT
+                    ).show();
                 });
             } catch (Exception error) {
                 runOnUiThread(() -> {
@@ -316,6 +350,143 @@ public final class MainActivity extends Activity {
                 });
             }
         });
+    }
+
+    private void showProfilesMenu() {
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.profiles_menu)
+            .setItems(new String[] {
+                getString(R.string.import_file),
+                getString(R.string.scan_qr)
+            }, (dialog, which) -> {
+                if (which == 0) {
+                    openConfigFile();
+                } else {
+                    scanQrCode();
+                }
+            })
+            .show();
+    }
+
+    private void openConfigFile() {
+        Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+            .putExtra(
+                Intent.EXTRA_MIME_TYPES,
+                new String[] {"text/plain", "application/json", "text/json"}
+            );
+        startActivityForResult(
+            Intent.createChooser(picker, getString(R.string.select_config_file)),
+            FILE_IMPORT_REQUEST
+        );
+    }
+
+    private void scanQrCode() {
+        new IntentIntegrator(this)
+            .setDesiredBarcodeFormats(IntentIntegrator.QR_CODE_TYPES)
+            .setPrompt(getString(R.string.qr_prompt))
+            .setBeepEnabled(false)
+            .setOrientationLocked(false)
+            .initiateScan();
+    }
+
+    private void importDocument(Uri uri) {
+        executor.execute(() -> {
+            try {
+                String fileName = documentName(uri);
+                String content = readDocument(uri);
+                List<ProfileImporter.ProfileData> profiles =
+                    ProfileImporter.importContent(content, fileName);
+                saveImportedProfiles(profiles);
+                runOnUiThread(() -> {
+                    render();
+                    renderProfiles();
+                    Toast.makeText(
+                        this,
+                        getString(R.string.profiles_imported, profiles.size()),
+                        Toast.LENGTH_LONG
+                    ).show();
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> inputError(
+                    error.getMessage() == null
+                        ? getString(R.string.file_read_failed)
+                        : error.getMessage()
+                ));
+            }
+        });
+    }
+
+    private void importExternalContent(String content, String fallbackName) {
+        executor.execute(() -> {
+            try {
+                List<ProfileImporter.ProfileData> profiles =
+                    ProfileImporter.importContent(content, fallbackName);
+                saveImportedProfiles(profiles);
+                runOnUiThread(() -> {
+                    render();
+                    renderProfiles();
+                    Toast.makeText(
+                        this,
+                        getString(R.string.profiles_imported, profiles.size()),
+                        Toast.LENGTH_LONG
+                    ).show();
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> inputError(error.getMessage()));
+            }
+        });
+    }
+
+    private void saveImportedProfiles(List<ProfileImporter.ProfileData> profiles) {
+        for (ProfileImporter.ProfileData profile : profiles) {
+            profileStore.saveActiveProfile(
+                profile.name,
+                profile.protocol,
+                profile.config,
+                profile.source
+            );
+        }
+    }
+
+    private String documentName(Uri uri) {
+        try (Cursor cursor = getContentResolver().query(
+            uri,
+            new String[] {OpenableColumns.DISPLAY_NAME},
+            null,
+            null,
+            null
+        )) {
+            if (cursor != null && cursor.moveToFirst()) {
+                String name = cursor.getString(0);
+                if (name != null && !name.trim().isEmpty()) {
+                    return name.replaceFirst("(?i)\\.json$", "");
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return "JSON profile";
+    }
+
+    private String readDocument(Uri uri) throws Exception {
+        try (InputStream input = getContentResolver().openInputStream(uri);
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            if (input == null) {
+                throw new IllegalArgumentException(getString(R.string.file_read_failed));
+            }
+            byte[] buffer = new byte[8192];
+            int total = 0;
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                total += read;
+                if (total > MAX_IMPORT_BYTES) {
+                    throw new IllegalArgumentException("Файл превышает допустимые 2 МБ");
+                }
+                output.write(buffer, 0, read);
+            }
+            return new String(output.toByteArray(), StandardCharsets.UTF_8);
+        }
     }
 
     private void showProfileActions() {

@@ -294,7 +294,7 @@
                 android:layout_weight="1"
                 android:text="@string/profiles_title"
                 android:textColor="@color/text_primary"
-                android:textSize="23sp"
+                android:textSize="18sp"
                 android:textStyle="bold" />
             <Button
                 android:id="@+id/ping_profiles"
@@ -303,6 +303,17 @@
                 android:text="@string/check_ping"
                 android:textAllCaps="false"
                 android:textSize="12sp" />
+            <TextView
+                android:id="@+id/profiles_menu_button"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="•••"
+                android:textColor="@color/text_secondary"
+                android:textSize="16sp" />
         </LinearLayout>
 
         <ScrollView

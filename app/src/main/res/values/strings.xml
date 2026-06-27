@@ -84,4 +84,12 @@
     <string name="update_permission">Разрешите установку обновлений H2Ray</string>
     <string name="profiles_count">Добавленные серверы: %1$d</string>
     <string name="ping_checking">Проверка…</string>
+    <string name="profiles_menu">Действия с профилями</string>
+    <string name="import_file">Импортировать .txt или .json</string>
+    <string name="scan_qr">Сканировать QR-код</string>
+    <string name="select_config_file">Выберите файл конфигурации</string>
+    <string name="file_read_failed">Не удалось прочитать файл</string>
+    <string name="profiles_imported">Импортировано профилей: %1$d</string>
+    <string name="qr_prompt">Наведите камеру на QR-код подключения</string>
+    <string name="qr_cancelled">Сканирование отменено</string>
 </resources>
