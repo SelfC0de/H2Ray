@@ -4,13 +4,16 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.h2ray.app.data.AppSettings;
+
 import java.util.Locale;
 
 public final class XrayConfigFactory {
     private XrayConfigFactory() {
     }
 
-    public static String createRuntimeConfig(String importedConfig) throws JSONException {
+    public static String createRuntimeConfig(String importedConfig, AppSettings settings)
+        throws JSONException {
         JSONObject config = new JSONObject(importedConfig);
         JSONArray outbounds = config.optJSONArray("outbounds");
         if (outbounds == null || outbounds.length() == 0) {
@@ -53,18 +56,42 @@ public final class XrayConfigFactory {
                 .put("name", "h2ray0")
                 .put("mtu", 1500)
                 .put("gateway", new JSONArray().put("10.10.0.1/30"))
-                .put("dns", new JSONArray().put("1.1.1.1").put("8.8.8.8")));
+                .put("dns", new JSONArray().put(settings.dns())));
+        tunInbound.put("sniffing", new JSONObject()
+            .put("enabled", true)
+            .put("routeOnly", true)
+            .put("destOverride", new JSONArray().put("http").put("tls").put("quic")));
 
         config.put("log", new JSONObject().put("loglevel", "warning"));
+        config.put("dns", new JSONObject()
+            .put("queryStrategy", settings.ipv6() ? "UseIP" : "UseIPv4")
+            .put("servers", new JSONArray().put(settings.dns())));
         config.put("inbounds", new JSONArray().put(tunInbound));
         config.put("outbounds", runtimeOutbounds);
+        JSONArray rules = new JSONArray();
+        if (settings.bypassPrivate()) {
+            rules.put(new JSONObject()
+                .put("type", "field")
+                .put("ip", privateNetworks)
+                .put("outboundTag", "direct"));
+        }
+        if (settings.bypassRu()) {
+            rules.put(new JSONObject()
+                .put("type", "field")
+                .put("domain", new JSONArray()
+                    .put("geosite:category-bank-ru")
+                    .put("geosite:category-gov-ru")
+                    .put("geosite:category-ru")
+                    .put("regexp:\\.ru$"))
+                .put("outboundTag", "direct"));
+            rules.put(new JSONObject()
+                .put("type", "field")
+                .put("ip", new JSONArray().put("geoip:ru"))
+                .put("outboundTag", "direct"));
+        }
         config.put("routing", new JSONObject()
             .put("domainStrategy", "IPIfNonMatch")
-            .put("rules", new JSONArray()
-                .put(new JSONObject()
-                    .put("type", "field")
-                    .put("ip", privateNetworks)
-                    .put("outboundTag", "direct"))));
+            .put("rules", rules));
         return config.toString();
     }
 

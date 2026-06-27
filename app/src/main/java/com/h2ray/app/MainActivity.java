@@ -18,16 +18,25 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.h2ray.app.data.ProfileStore;
 import com.h2ray.app.data.ConnectionStatusStore;
+import com.h2ray.app.data.AppSettings;
 import com.h2ray.app.vpn.H2RayVpnService;
 import com.h2ray.app.xray.XrayBridge;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.util.List;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public final class MainActivity extends Activity {
     private static final int VPN_PERMISSION_REQUEST = 100;
@@ -43,6 +52,11 @@ public final class MainActivity extends Activity {
     private Button importButton;
     private ProfileStore profileStore;
     private ConnectionStatusStore connectionStatusStore;
+    private AppSettings appSettings;
+    private LinearLayout profilesList;
+    private View homeScreen;
+    private View profilesScreen;
+    private View settingsScreen;
 
     private final Runnable stateUpdater = new Runnable() {
         @Override
@@ -59,28 +73,35 @@ public final class MainActivity extends Activity {
 
         profileStore = new ProfileStore(this);
         connectionStatusStore = new ConnectionStatusStore(this);
+        appSettings = new AppSettings(this);
         connectionStatus = findViewById(R.id.connection_status);
         connectionError = findViewById(R.id.connection_error);
         profileName = findViewById(R.id.profile_name);
         profileDetails = findViewById(R.id.profile_details);
         connectButton = findViewById(R.id.connect_button);
         importButton = findViewById(R.id.import_button);
+        profilesList = findViewById(R.id.profiles_list);
+        homeScreen = findViewById(R.id.home_screen);
+        profilesScreen = findViewById(R.id.profiles_screen);
+        settingsScreen = findViewById(R.id.settings_screen);
 
         connectButton.setOnClickListener(view -> toggleConnection());
         importButton.setOnClickListener(view -> showImportDialog());
         connectionError.setOnClickListener(view -> showConnectionError());
         findViewById(R.id.profile_card).setOnClickListener(view -> showProfileActions());
         findViewById(R.id.header_menu_button).setOnClickListener(view -> showAppMenu());
-        findViewById(R.id.nav_home).setOnClickListener(
-            view -> Toast.makeText(this, R.string.home_opened, Toast.LENGTH_SHORT).show()
-        );
-        findViewById(R.id.nav_profiles).setOnClickListener(view -> showProfileActions());
+        findViewById(R.id.nav_home).setOnClickListener(view -> showScreen("home"));
+        findViewById(R.id.nav_profiles).setOnClickListener(view -> showScreen("profiles"));
         findViewById(R.id.nav_rules).setOnClickListener(
             view -> Toast.makeText(this, R.string.rules_next_stage, Toast.LENGTH_SHORT).show()
         );
-        findViewById(R.id.nav_settings).setOnClickListener(
-            view -> Toast.makeText(this, R.string.settings_next_stage, Toast.LENGTH_SHORT).show()
+        findViewById(R.id.nav_settings).setOnClickListener(view -> showScreen("settings"));
+        findViewById(R.id.add_profile).setOnClickListener(view -> showImportDialog());
+        findViewById(R.id.ping_profiles).setOnClickListener(view -> pingProfiles());
+        findViewById(R.id.open_logs).setOnClickListener(
+            view -> startActivity(new Intent(this, LogsActivity.class))
         );
+        configureSettings();
         applySystemBarInsets();
         requestNotificationPermissionIfNeeded();
         render();
@@ -190,6 +211,7 @@ public final class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     dialog.dismiss();
                     render();
+                    renderProfiles();
                     Toast.makeText(this, R.string.profile_imported, Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception error) {
@@ -232,6 +254,165 @@ public final class MainActivity extends Activity {
             .setMessage(R.string.app_information)
             .setPositiveButton(android.R.string.ok, null)
             .show();
+    }
+
+    private void showScreen(String target) {
+        homeScreen.setVisibility("home".equals(target) ? View.VISIBLE : View.GONE);
+        profilesScreen.setVisibility("profiles".equals(target) ? View.VISIBLE : View.GONE);
+        settingsScreen.setVisibility("settings".equals(target) ? View.VISIBLE : View.GONE);
+        setNavColor(R.id.nav_home, "home".equals(target));
+        setNavColor(R.id.nav_profiles, "profiles".equals(target));
+        setNavColor(R.id.nav_rules, false);
+        setNavColor(R.id.nav_settings, "settings".equals(target));
+        if ("profiles".equals(target)) {
+            renderProfiles();
+        }
+        if ("settings".equals(target)) {
+            renderSettings();
+        }
+    }
+
+    private void setNavColor(int id, boolean active) {
+        ((TextView) findViewById(id)).setTextColor(
+            getColor(active ? R.color.accent : R.color.text_secondary)
+        );
+    }
+
+    private void renderProfiles() {
+        profilesList.removeAllViews();
+        List<ProfileStore.Profile> profiles = profileStore.getProfiles();
+        ProfileStore.Profile active = profileStore.getActiveProfile();
+        if (profiles.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText(R.string.no_profiles);
+            empty.setTextColor(getColor(R.color.text_secondary));
+            empty.setTextSize(14);
+            empty.setPadding(16, 48, 16, 48);
+            profilesList.addView(empty);
+            return;
+        }
+        for (ProfileStore.Profile profile : profiles) {
+            TextView row = new TextView(this);
+            String marker = active != null && active.id.equals(profile.id) ? "●  " : "○  ";
+            String ping = profile.ping < 0
+                ? "—"
+                : profile.ping == Long.MAX_VALUE ? getString(R.string.ping_failed) : profile.ping + " ms";
+            row.setText(marker + profile.name + "\n     " + profile.protocol + "  ·  " + ping);
+            row.setTextColor(getColor(R.color.text_primary));
+            row.setTextSize(14);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setPadding(16, 10, 16, 10);
+            row.setBackgroundResource(R.drawable.bg_card);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(72)
+            );
+            params.bottomMargin = dp(10);
+            row.setLayoutParams(params);
+            row.setOnClickListener(view -> {
+                profileStore.select(profile.id);
+                render();
+                renderProfiles();
+            });
+            row.setOnLongClickListener(view -> {
+                confirmDeleteProfile(profile);
+                return true;
+            });
+            profilesList.addView(row);
+        }
+    }
+
+    private void confirmDeleteProfile(ProfileStore.Profile profile) {
+        new AlertDialog.Builder(this)
+            .setTitle(profile.name)
+            .setMessage(R.string.delete_profile)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.delete_profile, (dialog, which) -> {
+                profileStore.delete(profile.id);
+                render();
+                renderProfiles();
+            })
+            .show();
+    }
+
+    private void pingProfiles() {
+        if (H2RayVpnService.isRunning()) {
+            Toast.makeText(this, R.string.ping_requires_disconnect, Toast.LENGTH_LONG).show();
+            return;
+        }
+        executor.execute(() -> {
+            for (ProfileStore.Profile profile : profileStore.getProfiles()) {
+                profileStore.updatePing(profile.id, measurePing(profile));
+                runOnUiThread(this::renderProfiles);
+            }
+        });
+    }
+
+    private long measurePing(ProfileStore.Profile profile) {
+        try {
+            JSONObject config = new JSONObject(profile.config);
+            JSONArray outbounds = config.getJSONArray("outbounds");
+            JSONObject settings = outbounds.getJSONObject(0).getJSONObject("settings");
+            String address = settings.getString("address");
+            int port = settings.getInt("port");
+            long start = System.nanoTime();
+            try (Socket socket = new Socket()) {
+                socket.connect(new InetSocketAddress(address, port), 3000);
+            }
+            return (System.nanoTime() - start) / 1_000_000L;
+        } catch (Exception error) {
+            return Long.MAX_VALUE;
+        }
+    }
+
+    private void configureSettings() {
+        Switch bypassRu = findViewById(R.id.setting_bypass_ru);
+        Switch bypassPrivate = findViewById(R.id.setting_bypass_private);
+        Switch ipv6 = findViewById(R.id.setting_ipv6);
+        bypassRu.setOnCheckedChangeListener((button, value) -> {
+            appSettings.setBypassRu(value);
+            settingsChanged();
+        });
+        bypassPrivate.setOnCheckedChangeListener((button, value) -> {
+            appSettings.setBypassPrivate(value);
+            settingsChanged();
+        });
+        ipv6.setOnCheckedChangeListener((button, value) -> {
+            appSettings.setIpv6(value);
+            settingsChanged();
+        });
+        findViewById(R.id.setting_dns).setOnClickListener(view -> chooseDns());
+        renderSettings();
+    }
+
+    private void renderSettings() {
+        ((Switch) findViewById(R.id.setting_bypass_ru)).setChecked(appSettings.bypassRu());
+        ((Switch) findViewById(R.id.setting_bypass_private)).setChecked(appSettings.bypassPrivate());
+        ((Switch) findViewById(R.id.setting_ipv6)).setChecked(appSettings.ipv6());
+        ((TextView) findViewById(R.id.setting_dns)).setText(
+            getString(R.string.dns_label, appSettings.dns())
+        );
+    }
+
+    private void chooseDns() {
+        String[] values = {"1.1.1.1", "8.8.8.8", "9.9.9.9"};
+        new AlertDialog.Builder(this)
+            .setTitle("DNS")
+            .setItems(values, (dialog, which) -> {
+                appSettings.setDns(values[which]);
+                renderSettings();
+                settingsChanged();
+            })
+            .show();
+    }
+
+    private void settingsChanged() {
+        if (H2RayVpnService.isRunning()) {
+            Toast.makeText(this, R.string.reconnect_settings, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private void showConnectionError() {
@@ -292,7 +473,7 @@ public final class MainActivity extends Activity {
         connectButton.setText(running ? R.string.disconnect : R.string.connect);
         profileName.setText(hasProfile ? profileStore.getName() : getString(R.string.no_profile));
         profileDetails.setText(hasProfile ? profileStore.getProtocol() : getString(R.string.import_required));
-        importButton.setText(hasProfile ? R.string.replace_profile : R.string.import_profile);
+        importButton.setText(R.string.add_profile);
     }
 
     private void requestNotificationPermissionIfNeeded() {

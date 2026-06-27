@@ -30,6 +30,25 @@
     <string name="home_opened">Вы уже на главном экране</string>
     <string name="rules_next_stage">Редактор правил будет добавлен на следующем этапе</string>
     <string name="settings_next_stage">Настройки будут добавлены на следующем этапе</string>
-    <string name="app_information">H2Ray\nPackage: com.h2ray.app\nCore: XTLS/libXray</string>
+    <string name="app_information">H2Ray — клиент защищённого подключения для Android.</string>
     <string name="connection_error_details">Ошибка Xray-core</string>
+    <string name="connection_logs">Журнал подключения</string>
+    <string name="copy_logs">Копировать</string>
+    <string name="clear_logs">Очистить</string>
+    <string name="logs_empty">Журнал пока пуст</string>
+    <string name="logs_copied">Журнал скопирован</string>
+    <string name="profiles_title">Профили</string>
+    <string name="settings_title">Настройки</string>
+    <string name="check_ping">Проверить</string>
+    <string name="add_profile">Добавить профиль</string>
+    <string name="no_profiles">Профилей пока нет</string>
+    <string name="ping_requires_disconnect">Для точного пинга сначала отключите VPN</string>
+    <string name="ping_failed">Ошибка</string>
+    <string name="routing_section">МАРШРУТИЗАЦИЯ</string>
+    <string name="bypass_ru">RU-сайты и банки напрямую</string>
+    <string name="bypass_private">Локальная сеть напрямую</string>
+    <string name="enable_ipv6">Маршрутизировать IPv6</string>
+    <string name="diagnostics_section">ДИАГНОСТИКА</string>
+    <string name="dns_label">DNS: %1$s</string>
+    <string name="reconnect_settings">Изменения применятся после переподключения</string>
 </resources>

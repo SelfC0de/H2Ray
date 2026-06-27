@@ -15,6 +15,8 @@ import android.util.Log;
 import com.h2ray.app.MainActivity;
 import com.h2ray.app.R;
 import com.h2ray.app.data.ConnectionStatusStore;
+import com.h2ray.app.data.AppSettings;
+import com.h2ray.app.data.LogStore;
 import com.h2ray.app.data.ProfileStore;
 import com.h2ray.app.xray.XrayBridge;
 import com.h2ray.app.xray.XrayConfigFactory;
@@ -38,6 +40,7 @@ public final class H2RayVpnService extends VpnService {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private ParcelFileDescriptor vpnInterface;
     private ConnectionStatusStore connectionStatus;
+    private LogStore logStore;
     private volatile boolean preserveFailure;
 
     public static Intent startIntent(Context context) {
@@ -56,6 +59,7 @@ public final class H2RayVpnService extends VpnService {
     public void onCreate() {
         super.onCreate();
         connectionStatus = new ConnectionStatusStore(this);
+        logStore = new LogStore(this);
         createNotificationChannel();
     }
 
@@ -70,6 +74,7 @@ public final class H2RayVpnService extends VpnService {
 
         preserveFailure = false;
         connectionStatus.setConnecting();
+        logStore.add("INFO", "Запуск VPN");
         startForeground(NOTIFICATION_ID, createNotification(getString(R.string.connecting)));
         executor.execute(this::startTunnel);
         return START_STICKY;
@@ -90,13 +95,17 @@ public final class H2RayVpnService extends VpnService {
             copyCoreAsset("geoip.dat");
             copyCoreAsset("geosite.dat");
 
+            AppSettings appSettings = new AppSettings(this);
             Builder builder = new Builder()
                 .setSession(getString(R.string.app_name))
                 .setMtu(1500)
                 .addAddress("10.10.0.2", 30)
                 .addRoute("0.0.0.0", 0)
-                .addDnsServer("1.1.1.1")
-                .addDnsServer("8.8.8.8");
+                .addDnsServer(appSettings.dns());
+            if (appSettings.ipv6()) {
+                builder.addAddress("fd00:10:10::2", 126)
+                    .addRoute("::", 0);
+            }
 
             vpnInterface = builder.establish();
             if (vpnInterface == null) {
@@ -105,17 +114,21 @@ public final class H2RayVpnService extends VpnService {
 
             XrayBridge.registerSocketProtection(this::protect);
             XrayBridge.setTunFd(vpnInterface.getFd());
-            String runtimeConfig = XrayConfigFactory.createRuntimeConfig(store.getConfig());
+            String runtimeConfig = XrayConfigFactory.createRuntimeConfig(
+                store.getConfig(), appSettings
+            );
             XrayBridge.start(getCoreDirectory().getAbsolutePath(), runtimeConfig);
 
             RUNNING.set(true);
             connectionStatus.setRunning();
             updateNotification(getString(R.string.connected));
             Log.i(TAG, "Xray tunnel started, core=" + XrayBridge.version());
+            logStore.add("INFO", "Xray запущен: " + XrayBridge.version());
         } catch (Exception error) {
             Log.e(TAG, "Unable to start tunnel", error);
             preserveFailure = true;
             connectionStatus.setError(error);
+            logStore.add("ERROR", error.toString());
             updateNotification(getString(R.string.connection_failed));
             stopTunnel();
         }
@@ -128,6 +141,7 @@ public final class H2RayVpnService extends VpnService {
         }
         try {
             XrayBridge.stop();
+            logStore.add("INFO", "VPN остановлен");
         } catch (Exception error) {
             Log.w(TAG, "Unable to stop Xray cleanly", error);
         }
