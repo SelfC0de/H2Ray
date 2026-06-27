@@ -21,6 +21,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.h2ray.app.data.ProfileStore;
+import com.h2ray.app.data.ConnectionStatusStore;
 import com.h2ray.app.vpn.H2RayVpnService;
 import com.h2ray.app.xray.XrayBridge;
 
@@ -36,9 +37,11 @@ public final class MainActivity extends Activity {
     private TextView connectionStatus;
     private TextView profileName;
     private TextView profileDetails;
+    private TextView connectionError;
     private Button connectButton;
     private Button importButton;
     private ProfileStore profileStore;
+    private ConnectionStatusStore connectionStatusStore;
 
     private final Runnable stateUpdater = new Runnable() {
         @Override
@@ -54,7 +57,9 @@ public final class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         profileStore = new ProfileStore(this);
+        connectionStatusStore = new ConnectionStatusStore(this);
         connectionStatus = findViewById(R.id.connection_status);
+        connectionError = findViewById(R.id.connection_error);
         profileName = findViewById(R.id.profile_name);
         profileDetails = findViewById(R.id.profile_details);
         connectButton = findViewById(R.id.connect_button);
@@ -210,7 +215,19 @@ public final class MainActivity extends Activity {
     private void render() {
         boolean running = H2RayVpnService.isRunning();
         boolean hasProfile = profileStore.hasActiveProfile();
-        connectionStatus.setText(running ? R.string.connected : R.string.disconnected);
+        String state = connectionStatusStore.getState();
+        if (running || ConnectionStatusStore.RUNNING.equals(state)) {
+            connectionStatus.setText(R.string.connected);
+        } else if (ConnectionStatusStore.CONNECTING.equals(state)) {
+            connectionStatus.setText(R.string.connecting);
+        } else if (ConnectionStatusStore.ERROR.equals(state)) {
+            connectionStatus.setText(R.string.connection_failed);
+        } else {
+            connectionStatus.setText(R.string.disconnected);
+        }
+        String error = connectionStatusStore.getError();
+        connectionError.setText(error);
+        connectionError.setVisibility(error.trim().isEmpty() ? View.GONE : View.VISIBLE);
         connectButton.setText(running ? R.string.disconnect : R.string.connect);
         profileName.setText(hasProfile ? profileStore.getName() : getString(R.string.no_profile));
         profileDetails.setText(hasProfile ? profileStore.getProtocol() : getString(R.string.import_required));

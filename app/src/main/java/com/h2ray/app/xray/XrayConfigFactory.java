@@ -16,6 +16,7 @@ public final class XrayConfigFactory {
         }
 
         JSONObject proxy = outbounds.getJSONObject(0);
+        proxy.remove("sendThrough");
         proxy.put("tag", "proxy");
 
         JSONArray runtimeOutbounds = new JSONArray().put(proxy);

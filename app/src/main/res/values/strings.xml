@@ -21,4 +21,10 @@
     <string name="import_failed">Не удалось импортировать профиль</string>
     <string name="vpn_notification_channel">VPN-подключение</string>
     <string name="vpn_notification_description">Состояние защищённого подключения H2Ray</string>
+    <string name="download">Загрузка</string>
+    <string name="upload">Отправлено</string>
+    <string name="nav_home">⌂\nГлавная</string>
+    <string name="nav_profiles">▤\nПрофили</string>
+    <string name="nav_rules">⌁\nПравила</string>
+    <string name="nav_settings">⚙\nНастройки</string>
 </resources>

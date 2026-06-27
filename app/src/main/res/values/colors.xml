@@ -7,5 +7,7 @@
     <color name="text_secondary">#8292AA</color>
     <color name="accent">#19D7E4</color>
     <color name="success">#42D69B</color>
+    <color name="error">#FF6F7D</color>
+    <color name="navigation">#F5070D19</color>
     <color name="launcher_background">#060B16</color>
 </resources>

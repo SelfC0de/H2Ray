@@ -14,6 +14,7 @@ import android.util.Log;
 
 import com.h2ray.app.MainActivity;
 import com.h2ray.app.R;
+import com.h2ray.app.data.ConnectionStatusStore;
 import com.h2ray.app.data.ProfileStore;
 import com.h2ray.app.xray.XrayBridge;
 import com.h2ray.app.xray.XrayConfigFactory;
@@ -36,6 +37,8 @@ public final class H2RayVpnService extends VpnService {
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private ParcelFileDescriptor vpnInterface;
+    private ConnectionStatusStore connectionStatus;
+    private volatile boolean preserveFailure;
 
     public static Intent startIntent(Context context) {
         return new Intent(context, H2RayVpnService.class).setAction(ACTION_START);
@@ -52,6 +55,7 @@ public final class H2RayVpnService extends VpnService {
     @Override
     public void onCreate() {
         super.onCreate();
+        connectionStatus = new ConnectionStatusStore(this);
         createNotificationChannel();
     }
 
@@ -59,10 +63,13 @@ public final class H2RayVpnService extends VpnService {
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
         if (ACTION_STOP.equals(action)) {
+            preserveFailure = false;
             executor.execute(this::stopTunnel);
             return START_NOT_STICKY;
         }
 
+        preserveFailure = false;
+        connectionStatus.setConnecting();
         startForeground(NOTIFICATION_ID, createNotification(getString(R.string.connecting)));
         executor.execute(this::startTunnel);
         return START_STICKY;
@@ -102,10 +109,13 @@ public final class H2RayVpnService extends VpnService {
             XrayBridge.start(getCoreDirectory().getAbsolutePath(), runtimeConfig);
 
             RUNNING.set(true);
+            connectionStatus.setRunning();
             updateNotification(getString(R.string.connected));
             Log.i(TAG, "Xray tunnel started, core=" + XrayBridge.version());
         } catch (Exception error) {
             Log.e(TAG, "Unable to start tunnel", error);
+            preserveFailure = true;
+            connectionStatus.setError(error);
             updateNotification(getString(R.string.connection_failed));
             stopTunnel();
         }
@@ -113,6 +123,9 @@ public final class H2RayVpnService extends VpnService {
 
     private synchronized void stopTunnel() {
         RUNNING.set(false);
+        if (!preserveFailure) {
+            connectionStatus.setStopped();
+        }
         try {
             XrayBridge.stop();
         } catch (Exception error) {
