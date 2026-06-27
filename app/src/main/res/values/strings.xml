@@ -4,10 +4,21 @@
     <string name="connection_state">Состояние подключения</string>
     <string name="disconnected">Не подключено</string>
     <string name="connected">Защищено</string>
+    <string name="connecting">Подключение…</string>
+    <string name="connection_failed">Ошибка подключения</string>
     <string name="connect">Подключить</string>
     <string name="disconnect">Отключить</string>
-    <string name="default_profile">Frankfurt · Main</string>
-    <string name="default_profile_details">VLESS · REALITY · Vision</string>
-    <string name="profiles_next_stage">Список профилей будет добавлен на следующем этапе</string>
-    <string name="core_not_integrated">Разрешение получено. Xray-core ещё не интегрирован.</string>
+    <string name="no_profile">Профиль не выбран</string>
+    <string name="import_required">Импортируйте конфигурацию</string>
+    <string name="import_profile">Импорт профиля</string>
+    <string name="replace_profile">Заменить профиль</string>
+    <string name="delete_profile">Удалить профиль</string>
+    <string name="import_action">Импортировать</string>
+    <string name="import_hint">vless://, vmess://, trojan://, ss:// или Xray JSON</string>
+    <string name="import_description">Вставьте share-ссылку или полную JSON-конфигурацию Xray.</string>
+    <string name="unsupported_profile">Поддерживаются VLESS, VMess, Trojan, Shadowsocks и Xray JSON.</string>
+    <string name="profile_imported">Профиль импортирован</string>
+    <string name="import_failed">Не удалось импортировать профиль</string>
+    <string name="vpn_notification_channel">VPN-подключение</string>
+    <string name="vpn_notification_description">Состояние защищённого подключения H2Ray</string>
 </resources>

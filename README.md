@@ -21,6 +21,14 @@ Release APK на текущем этапе не подписывается produ
 
 ## Текущее состояние
 
-Собирается базовый Android-интерфейс и зарегистрирован `VpnService`. Реальное подключение через Xray-core пока не реализовано.
+GitHub Actions собирает официальный `XTLS/libXray` и встраивает Xray-core в APK. Приложение:
+
+- импортирует `vless://`, `vmess://`, `trojan://`, `ss://` и Xray JSON;
+- создаёт Android TUN через `VpnService`;
+- передаёт TUN FD напрямую в Xray-core;
+- исключает outbound-сокеты core из VPN через `VpnService.protect`;
+- запускает VPN как foreground service.
+
+Реальная совместимость конкретной конфигурации проверяется на Android-устройстве с доступным сервером.
 
 Интерактивный UI-прототип находится в каталоге [`mockups`](mockups).

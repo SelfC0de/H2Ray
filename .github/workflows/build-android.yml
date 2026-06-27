@@ -35,11 +35,37 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.3"
+          cache: false
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: "9.4.1"
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Restore Go caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: libxray-${{ runner.os }}-17fec28f6f9cf7ead6df6d639b6ca3abb7134ab0
+
+      - name: Build libXray AAR
+        shell: bash
+        run: |
+          git clone https://github.com/XTLS/libXray.git "$RUNNER_TEMP/libXray"
+          git -C "$RUNNER_TEMP/libXray" checkout 17fec28f6f9cf7ead6df6d639b6ca3abb7134ab0
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          python3 "$RUNNER_TEMP/libXray/build/main.py" android
+          mkdir -p app/libs app/src/main/assets
+          cp "$RUNNER_TEMP/libXray/libXray.aar" app/libs/libXray.aar
+          cp "$RUNNER_TEMP/libXray/dat/geoip.dat" app/src/main/assets/geoip.dat
+          cp "$RUNNER_TEMP/libXray/dat/geosite.dat" app/src/main/assets/geosite.dat
 
       - name: Build APK
         shell: bash

@@ -29,3 +29,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
+
+dependencies {
+    implementation(files("libs/libXray.aar"))
+}

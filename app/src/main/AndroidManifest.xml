@@ -23,6 +23,7 @@
         <service
             android:name=".vpn.H2RayVpnService"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="specialUse"
             android:permission="android.permission.BIND_VPN_SERVICE">
             <property
