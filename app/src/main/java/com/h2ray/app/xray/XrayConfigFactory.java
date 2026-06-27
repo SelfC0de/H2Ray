@@ -79,7 +79,7 @@ public final class XrayConfigFactory {
 
         String security = stream.optString("security", "none");
         if ("reality".equalsIgnoreCase(security)) {
-            setDefaultFingerprint(stream, "realitySettings");
+            normalizeRealitySettings(stream);
             if (!"raw".equals(network) && !"xhttp".equals(network) && !"grpc".equals(network)) {
                 throw new JSONException("REALITY поддерживает только RAW, XHTTP и gRPC");
             }
@@ -90,6 +90,46 @@ public final class XrayConfigFactory {
             tls.remove("verifyPeerCertInNames");
             tls.remove("echForceQuery");
         }
+    }
+
+    private static void normalizeRealitySettings(JSONObject stream) throws JSONException {
+        JSONObject source = stream.optJSONObject("realitySettings");
+        if (source == null) {
+            source = new JSONObject();
+        }
+
+        String password = stringValue(source, "password");
+        if (password.trim().isEmpty()) {
+            password = stringValue(source, "publicKey");
+        }
+
+        JSONObject client = new JSONObject()
+            .put("fingerprint", valueOrDefault(source, "fingerprint", "chrome"))
+            .put("serverName", stringValue(source, "serverName"))
+            .put("password", password)
+            .put("shortId", stringValue(source, "shortId"));
+
+        copyNonEmpty(source, client, "mldsa65Verify");
+        copyNonEmpty(source, client, "spiderX");
+        copyNonEmpty(source, client, "masterKeyLog");
+        stream.put("realitySettings", client);
+    }
+
+    private static String valueOrDefault(JSONObject source, String key, String fallback) {
+        String value = stringValue(source, key);
+        return value.trim().isEmpty() ? fallback : value;
+    }
+
+    private static void copyNonEmpty(JSONObject source, JSONObject destination, String key)
+        throws JSONException {
+        String value = stringValue(source, key);
+        if (!value.trim().isEmpty()) {
+            destination.put(key, value);
+        }
+    }
+
+    private static String stringValue(JSONObject source, String key) {
+        return source.has(key) && !source.isNull(key) ? source.optString(key, "") : "";
     }
 
     private static String normalizeNetwork(String network) {
