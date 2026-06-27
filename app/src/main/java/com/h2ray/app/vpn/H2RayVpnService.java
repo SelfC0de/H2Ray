@@ -257,17 +257,22 @@ public final class H2RayVpnService extends VpnService {
 
     private void resolvePublicIp() {
         try {
-            Thread.sleep(750);
-            if (CORE_STATE.get() != CoreState.RUNNING) {
-                return;
+            for (int attempt = 0; attempt < 3; attempt++) {
+                Thread.sleep(attempt == 0 ? 1500 : 2500);
+                if (CORE_STATE.get() != CoreState.RUNNING) {
+                    return;
+                }
+                if (!connectionStatus.getPublicIp().trim().isEmpty()) {
+                    return;
+                }
+                String ip = PublicIpResolver.resolve();
+                if (!ip.isEmpty() && CORE_STATE.get() == CoreState.RUNNING) {
+                    connectionStatus.setPublicIp(ip);
+                    logStore.add("INFO", "Внешний IP определён");
+                    return;
+                }
             }
-            String ip = PublicIpResolver.resolve();
-            if (!ip.isEmpty() && CORE_STATE.get() == CoreState.RUNNING) {
-                connectionStatus.setPublicIp(ip);
-                logStore.add("INFO", "Внешний IP определён");
-            } else {
-                logStore.add("WARN", "Сервис внешнего IP недоступен");
-            }
+            logStore.add("WARN", "Сервисы внешнего IP недоступны после повторных попыток");
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
         }

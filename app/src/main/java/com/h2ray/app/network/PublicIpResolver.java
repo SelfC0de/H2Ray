@@ -8,37 +8,89 @@ import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 public final class PublicIpResolver {
-    private static final String[] JSON_ENDPOINTS = {
-        "https://api.ipify.org?format=json",
-        "https://api64.ipify.org?format=json"
+    private static final long RESOLVE_TIMEOUT_MILLIS = 9000;
+    private static final Endpoint[] ENDPOINTS = {
+        new Endpoint("https://api.ipify.org?format=json", ResponseType.JSON),
+        new Endpoint("https://api64.ipify.org?format=json", ResponseType.JSON),
+        new Endpoint("https://checkip.amazonaws.com", ResponseType.TEXT),
+        new Endpoint("https://icanhazip.com", ResponseType.TEXT),
+        new Endpoint("https://ifconfig.me/ip", ResponseType.TEXT),
+        new Endpoint("https://www.cloudflare.com/cdn-cgi/trace", ResponseType.TRACE)
     };
 
     private PublicIpResolver() {
     }
 
     public static String resolve() {
-        for (String endpoint : JSON_ENDPOINTS) {
-            String body = request(endpoint);
-            if (!body.isEmpty()) {
-                try {
-                    String ip = new JSONObject(body).optString("ip", "");
-                    if (isIpAddress(ip)) {
-                        return ip;
-                    }
-                } catch (Exception ignored) {
-                }
+        ExecutorService pool = Executors.newFixedThreadPool(ENDPOINTS.length);
+        CompletionService<String> completion = new ExecutorCompletionService<>(pool);
+        List<Future<String>> requests = new ArrayList<>();
+        try {
+            for (Endpoint endpoint : ENDPOINTS) {
+                requests.add(completion.submit(() -> resolve(endpoint)));
             }
-        }
-
-        String trace = request("https://www.cloudflare.com/cdn-cgi/trace");
-        for (String line : trace.split("\\R")) {
-            if (line.startsWith("ip=")) {
-                String ip = line.substring(3).trim();
-                if (isIpAddress(ip)) {
+            long deadline = System.nanoTime()
+                + TimeUnit.MILLISECONDS.toNanos(RESOLVE_TIMEOUT_MILLIS);
+            for (int completed = 0; completed < ENDPOINTS.length; completed++) {
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) {
+                    break;
+                }
+                Future<String> request = completion.poll(remaining, TimeUnit.NANOSECONDS);
+                if (request == null) {
+                    break;
+                }
+                String ip = request.get();
+                if (!ip.isEmpty()) {
                     return ip;
                 }
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+        } catch (Exception ignored) {
+        } finally {
+            for (Future<String> request : requests) {
+                request.cancel(true);
+            }
+            pool.shutdownNow();
+        }
+        return "";
+    }
+
+    private static String resolve(Endpoint endpoint) {
+        String body = request(endpoint.url);
+        if (body.isEmpty()) {
+            return "";
+        }
+        try {
+            String candidate;
+            if (endpoint.type == ResponseType.JSON) {
+                candidate = new JSONObject(body).optString("ip", "");
+            } else if (endpoint.type == ResponseType.TRACE) {
+                candidate = traceIp(body);
+            } else {
+                candidate = body.trim();
+            }
+            return isIpAddress(candidate) ? candidate.trim() : "";
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private static String traceIp(String body) {
+        for (String line : body.split("\\R")) {
+            if (line.startsWith("ip=")) {
+                return line.substring(3).trim();
             }
         }
         return "";
@@ -52,7 +104,8 @@ public final class PublicIpResolver {
             connection.setReadTimeout(6000);
             connection.setUseCaches(false);
             connection.setRequestProperty("Accept", "application/json,text/plain");
-            connection.setRequestProperty("User-Agent", "H2Ray/0.1");
+            connection.setRequestProperty("Connection", "close");
+            connection.setRequestProperty("User-Agent", "H2Ray/1.0");
             if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
                 return "";
             }
@@ -84,6 +137,22 @@ public final class PublicIpResolver {
             return InetAddress.getByName(candidate).getHostAddress() != null;
         } catch (Exception ignored) {
             return false;
+        }
+    }
+
+    private enum ResponseType {
+        JSON,
+        TEXT,
+        TRACE
+    }
+
+    private static final class Endpoint {
+        private final String url;
+        private final ResponseType type;
+
+        private Endpoint(String url, ResponseType type) {
+            this.url = url;
+            this.type = type;
         }
     }
 }

@@ -13,7 +13,7 @@ android {
         minSdk = 28
         targetSdk = 36
         versionCode = System.getenv("H2RAY_VERSION_CODE")?.toIntOrNull() ?: 1
-        versionName = System.getenv("H2RAY_VERSION_NAME") ?: "1.0.0.0"
+        versionName = System.getenv("H2RAY_VERSION_NAME") ?: "1.0.0.1"
     }
 
     signingConfigs {
