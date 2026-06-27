@@ -15,6 +15,7 @@ public final class ConnectionStatusStore {
     private static final String KEY_RX_BASE = "rx_base";
     private static final String KEY_TX_BASE = "tx_base";
     private static final String KEY_PUBLIC_IP = "public_ip";
+    private static final String KEY_DIRECT_IP = "direct_ip";
 
     private final SharedPreferences preferences;
 
@@ -70,6 +71,14 @@ public final class ConnectionStatusStore {
 
     public void setPublicIp(String value) {
         preferences.edit().putString(KEY_PUBLIC_IP, value).apply();
+    }
+
+    public String getDirectIp() {
+        return preferences.getString(KEY_DIRECT_IP, "");
+    }
+
+    public void setDirectIp(String value) {
+        preferences.edit().putString(KEY_DIRECT_IP, value).apply();
     }
 
     private void save(String state, String error) {

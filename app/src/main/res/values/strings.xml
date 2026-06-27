@@ -66,5 +66,7 @@
     <string name="menu_logs">Журнал</string>
     <string name="menu_about">О приложении</string>
     <string name="ip_check_failed">IP не определён</string>
+    <string name="direct_ip">Исходный IP</string>
+    <string name="proxy_ip">VPN IP</string>
     <string name="reconnect_settings">Изменения применятся после переподключения</string>
 </resources>

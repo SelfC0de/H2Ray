@@ -230,7 +230,10 @@
                     android:background="@drawable/bg_stat"
                     android:gravity="center"
                     android:orientation="vertical">
-                    <TextView style="@style/H2RayStatLabel" android:text="IP" />
+                    <TextView
+                        android:id="@+id/stat_ip_label"
+                        style="@style/H2RayStatLabel"
+                        android:text="@string/direct_ip" />
                     <TextView
                         android:id="@+id/stat_ip"
                         style="@style/H2RayStatValue"

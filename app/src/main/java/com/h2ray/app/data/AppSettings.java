@@ -9,10 +9,11 @@ public final class AppSettings {
 
     public AppSettings(Context context) {
         preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
+        migrateSecureDefaults();
     }
 
     public boolean bypassRu() {
-        return preferences.getBoolean("bypass_ru", true);
+        return preferences.getBoolean("bypass_ru", false);
     }
 
     public void setBypassRu(boolean value) {
@@ -52,7 +53,7 @@ public final class AppSettings {
     }
 
     public String routingMode() {
-        return preferences.getString("routing_mode", "rules");
+        return preferences.getString("routing_mode", "global");
     }
 
     public void setRoutingMode(String value) {
@@ -81,5 +82,16 @@ public final class AppSettings {
 
     public void setSniffing(boolean value) {
         preferences.edit().putBoolean("sniffing", value).apply();
+    }
+
+    private void migrateSecureDefaults() {
+        if (preferences.getBoolean("secure_defaults_v2", false)) {
+            return;
+        }
+        preferences.edit()
+            .putBoolean("bypass_ru", false)
+            .putString("routing_mode", "global")
+            .putBoolean("secure_defaults_v2", true)
+            .apply();
     }
 }

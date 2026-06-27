@@ -70,6 +70,7 @@ public final class MainActivity extends Activity {
     private TextView statDownload;
     private TextView statUpload;
     private TextView statIp;
+    private TextView statIpLabel;
     private final AtomicBoolean ipLookupRunning = new AtomicBoolean(false);
     private volatile long lastIpAttempt;
 
@@ -88,6 +89,9 @@ public final class MainActivity extends Activity {
 
         profileStore = new ProfileStore(this);
         connectionStatusStore = new ConnectionStatusStore(this);
+        if (!H2RayVpnService.isRunning()) {
+            connectionStatusStore.setDirectIp("");
+        }
         appSettings = new AppSettings(this);
         connectionStatus = findViewById(R.id.connection_status);
         connectionError = findViewById(R.id.connection_error);
@@ -103,6 +107,7 @@ public final class MainActivity extends Activity {
         statDownload = findViewById(R.id.stat_download);
         statUpload = findViewById(R.id.stat_upload);
         statIp = findViewById(R.id.stat_ip);
+        statIpLabel = findViewById(R.id.stat_ip_label);
 
         connectButton.setOnClickListener(view -> toggleConnection());
         importButton.setOnClickListener(view -> showImportDialog());
@@ -605,10 +610,17 @@ public final class MainActivity extends Activity {
         if (!running) {
             statDownload.setText("—");
             statUpload.setText("—");
-            statIp.setText("—");
+            statIpLabel.setText(R.string.direct_ip);
+            statIp.setTextColor(getColor(R.color.text_primary));
+            String directIp = connectionStatusStore.getDirectIp();
+            statIp.setText(directIp.trim().isEmpty() ? "…" : directIp);
+            if (directIp.trim().isEmpty()) {
+                resolveDirectIp();
+            }
             return;
         }
 
+        statIpLabel.setText(R.string.proxy_ip);
         long rx = TrafficStats.getUidRxBytes(Process.myUid());
         long tx = TrafficStats.getUidTxBytes(Process.myUid());
         long download = rx == TrafficStats.UNSUPPORTED
@@ -619,6 +631,9 @@ public final class MainActivity extends Activity {
         statUpload.setText(formatBytes(upload));
         String publicIp = connectionStatusStore.getPublicIp();
         statIp.setText(publicIp.trim().isEmpty() ? "…" : publicIp);
+        boolean sameAsDirect = !publicIp.trim().isEmpty()
+            && publicIp.equals(connectionStatusStore.getDirectIp());
+        statIp.setTextColor(getColor(sameAsDirect ? R.color.error : R.color.text_primary));
         if (publicIp.trim().isEmpty()) {
             resolvePublicIp(false);
         }
@@ -641,9 +656,9 @@ public final class MainActivity extends Activity {
 
     private void resolvePublicIp(boolean force) {
         if (!H2RayVpnService.isRunning()) {
-            if (force) {
-                Toast.makeText(this, R.string.ip_check_failed, Toast.LENGTH_SHORT).show();
-            }
+            connectionStatusStore.setDirectIp("");
+            lastIpAttempt = 0;
+            resolveDirectIp();
             return;
         }
         if (!force && !connectionStatusStore.getPublicIp().trim().isEmpty()) {
@@ -670,6 +685,25 @@ public final class MainActivity extends Activity {
                     Toast.makeText(this, R.string.ip_check_failed, Toast.LENGTH_SHORT).show();
                 }
             });
+        });
+    }
+
+    private void resolveDirectIp() {
+        if (H2RayVpnService.isRunning() || H2RayVpnService.isBusy()) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastIpAttempt < 30000 || !ipLookupRunning.compareAndSet(false, true)) {
+            return;
+        }
+        lastIpAttempt = now;
+        executor.execute(() -> {
+            String result = PublicIpResolver.resolve();
+            if (!result.isEmpty() && !H2RayVpnService.isRunning()) {
+                connectionStatusStore.setDirectIp(result);
+            }
+            ipLookupRunning.set(false);
+            runOnUiThread(() -> renderStats(H2RayVpnService.isRunning()));
         });
     }
 
