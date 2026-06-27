@@ -3,14 +3,11 @@ name: Build Android APK
 on:
   workflow_dispatch:
     inputs:
-      build_type:
-        description: Build variant
+      version_name:
+        description: Public version (for example 0.2.0)
         required: true
-        default: debug
-        type: choice
-        options:
-          - debug
-          - release
+        default: "0.2.0"
+        type: string
 
 permissions:
   contents: read
@@ -21,7 +18,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build ${{ inputs.build_type }} APK
+    name: Build signed release APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -69,19 +66,49 @@ jobs:
           cp "$RUNNER_TEMP/libXray/dat/geoip.dat" app/src/main/assets/geoip.dat
           cp "$RUNNER_TEMP/libXray/dat/geosite.dat" app/src/main/assets/geosite.dat
 
-      - name: Build APK
+      - name: Prepare release signing
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.H2RAY_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.H2RAY_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.H2RAY_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.H2RAY_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_BASE64"
+          test -n "$KEYSTORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+          mkdir -p "$RUNNER_TEMP/signing"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/signing/H2Ray-release.jks"
+          chmod 600 "$RUNNER_TEMP/signing/H2Ray-release.jks"
+          {
+            echo "H2RAY_KEYSTORE_PATH=$RUNNER_TEMP/signing/H2Ray-release.jks"
+            echo "H2RAY_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "H2RAY_KEY_ALIAS=$KEY_ALIAS"
+            echo "H2RAY_KEY_PASSWORD=$KEY_PASSWORD"
+            echo "H2RAY_VERSION_CODE=${{ github.run_number }}"
+            echo "H2RAY_VERSION_NAME=${{ inputs.version_name }}"
+          } >> "$GITHUB_ENV"
+
+      - name: Build signed release APK
+        shell: bash
+        run: gradle :app:assembleRelease --stacktrace
+
+      - name: Verify and name APK
         shell: bash
         run: |
-          if [[ "${{ inputs.build_type }}" == "release" ]]; then
-            gradle :app:assembleRelease --stacktrace
-          else
-            gradle :app:assembleDebug --stacktrace
-          fi
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -f "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose "$APK"
+          mkdir -p output
+          cp "$APK" output/H2Ray.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v7
         with:
-          name: h2ray-${{ inputs.build_type }}-${{ github.run_number }}
-          path: app/build/outputs/apk/${{ inputs.build_type }}/*.apk
+          name: H2Ray-${{ inputs.version_name }}
+          path: output/H2Ray.apk
           if-no-files-found: error
           retention-days: 1

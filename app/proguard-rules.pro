@@ -1,1 +1,2 @@
 -keepattributes *Annotation*
+-keep class libXray.** { *; }

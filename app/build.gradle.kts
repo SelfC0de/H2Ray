@@ -2,6 +2,8 @@ plugins {
     id("com.android.application")
 }
 
+val releaseKeystorePath = System.getenv("H2RAY_KEYSTORE_PATH")
+
 android {
     namespace = "com.h2ray.app"
     compileSdk = 36
@@ -10,13 +12,27 @@ android {
         applicationId = "com.h2ray.app"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = System.getenv("H2RAY_VERSION_CODE")?.toIntOrNull() ?: 1
+        versionName = System.getenv("H2RAY_VERSION_NAME") ?: "0.2.0"
+    }
+
+    signingConfigs {
+        if (!releaseKeystorePath.isNullOrBlank()) {
+            create("release") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = System.getenv("H2RAY_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("H2RAY_KEY_ALIAS")
+                keyPassword = System.getenv("H2RAY_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
+            signingConfigs.findByName("release")?.let {
+                signingConfig = it
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

@@ -9,3 +9,6 @@ captures/
 app/libs/*.aar
 *.apk
 *.zip
+signing/
+*.jks
+*.keystore

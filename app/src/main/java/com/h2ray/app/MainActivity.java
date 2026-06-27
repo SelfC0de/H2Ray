@@ -294,8 +294,7 @@ public final class MainActivity extends Activity {
                 } else {
                     new AlertDialog.Builder(this)
                         .setTitle(R.string.app_name)
-                        .setMessage(getString(R.string.app_information)
-                            + "\nXray-core: " + XrayBridge.version())
+                        .setMessage(R.string.app_information)
                         .setPositiveButton(android.R.string.ok, null)
                         .show();
                 }
