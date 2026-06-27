@@ -12,6 +12,9 @@ public final class ConnectionStatusStore {
     private static final String PREFERENCES = "h2ray_connection";
     private static final String KEY_STATE = "state";
     private static final String KEY_ERROR = "error";
+    private static final String KEY_RX_BASE = "rx_base";
+    private static final String KEY_TX_BASE = "tx_base";
+    private static final String KEY_PUBLIC_IP = "public_ip";
 
     private final SharedPreferences preferences;
 
@@ -31,8 +34,14 @@ public final class ConnectionStatusStore {
         save(CONNECTING, "");
     }
 
-    public void setRunning() {
-        save(RUNNING, "");
+    public void setRunning(long rxBase, long txBase) {
+        preferences.edit()
+            .putString(KEY_STATE, RUNNING)
+            .putString(KEY_ERROR, "")
+            .putLong(KEY_RX_BASE, rxBase)
+            .putLong(KEY_TX_BASE, txBase)
+            .putString(KEY_PUBLIC_IP, "")
+            .apply();
     }
 
     public void setStopped() {
@@ -47,10 +56,27 @@ public final class ConnectionStatusStore {
         save(ERROR, message);
     }
 
+    public long getRxBase() {
+        return preferences.getLong(KEY_RX_BASE, 0);
+    }
+
+    public long getTxBase() {
+        return preferences.getLong(KEY_TX_BASE, 0);
+    }
+
+    public String getPublicIp() {
+        return preferences.getString(KEY_PUBLIC_IP, "");
+    }
+
+    public void setPublicIp(String value) {
+        preferences.edit().putString(KEY_PUBLIC_IP, value).apply();
+    }
+
     private void save(String state, String error) {
         preferences.edit()
             .putString(KEY_STATE, state)
             .putString(KEY_ERROR, error)
+            .putString(KEY_PUBLIC_IP, "")
             .apply();
     }
 }

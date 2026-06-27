@@ -9,11 +9,17 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.VpnService;
+import android.net.TrafficStats;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Process;
+import android.os.SystemClock;
 import android.text.InputType;
+import android.text.Spannable;
+import android.text.SpannableString;
+import android.text.style.RelativeSizeSpan;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
@@ -32,8 +38,15 @@ import com.h2ray.app.xray.XrayBridge;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.net.InetSocketAddress;
+import java.net.HttpURLConnection;
 import java.net.Socket;
+import java.net.URL;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -56,7 +69,13 @@ public final class MainActivity extends Activity {
     private LinearLayout profilesList;
     private View homeScreen;
     private View profilesScreen;
+    private View rulesScreen;
     private View settingsScreen;
+    private TextView statDownload;
+    private TextView statUpload;
+    private TextView statIp;
+    private final AtomicBoolean ipLookupRunning = new AtomicBoolean(false);
+    private volatile long lastIpAttempt;
 
     private final Runnable stateUpdater = new Runnable() {
         @Override
@@ -83,7 +102,11 @@ public final class MainActivity extends Activity {
         profilesList = findViewById(R.id.profiles_list);
         homeScreen = findViewById(R.id.home_screen);
         profilesScreen = findViewById(R.id.profiles_screen);
+        rulesScreen = findViewById(R.id.rules_screen);
         settingsScreen = findViewById(R.id.settings_screen);
+        statDownload = findViewById(R.id.stat_download);
+        statUpload = findViewById(R.id.stat_upload);
+        statIp = findViewById(R.id.stat_ip);
 
         connectButton.setOnClickListener(view -> toggleConnection());
         importButton.setOnClickListener(view -> showImportDialog());
@@ -92,9 +115,7 @@ public final class MainActivity extends Activity {
         findViewById(R.id.header_menu_button).setOnClickListener(view -> showAppMenu());
         findViewById(R.id.nav_home).setOnClickListener(view -> showScreen("home"));
         findViewById(R.id.nav_profiles).setOnClickListener(view -> showScreen("profiles"));
-        findViewById(R.id.nav_rules).setOnClickListener(
-            view -> Toast.makeText(this, R.string.rules_next_stage, Toast.LENGTH_SHORT).show()
-        );
+        findViewById(R.id.nav_rules).setOnClickListener(view -> showScreen("rules"));
         findViewById(R.id.nav_settings).setOnClickListener(view -> showScreen("settings"));
         findViewById(R.id.add_profile).setOnClickListener(view -> showImportDialog());
         findViewById(R.id.ping_profiles).setOnClickListener(view -> pingProfiles());
@@ -102,6 +123,8 @@ public final class MainActivity extends Activity {
             view -> startActivity(new Intent(this, LogsActivity.class))
         );
         configureSettings();
+        configureRules();
+        configureNavigationLabels();
         applySystemBarInsets();
         requestNotificationPermissionIfNeeded();
         render();
@@ -126,6 +149,9 @@ public final class MainActivity extends Activity {
     }
 
     private void toggleConnection() {
+        if (H2RayVpnService.isBusy()) {
+            return;
+        }
         if (H2RayVpnService.isRunning()) {
             startService(H2RayVpnService.stopIntent(this));
             render();
@@ -249,26 +275,63 @@ public final class MainActivity extends Activity {
     }
 
     private void showAppMenu() {
+        String[] actions = {
+            getString(R.string.menu_reconnect),
+            getString(R.string.menu_refresh_ip),
+            getString(R.string.menu_logs),
+            getString(R.string.menu_about)
+        };
         new AlertDialog.Builder(this)
             .setTitle(R.string.app_name)
-            .setMessage(R.string.app_information)
-            .setPositiveButton(android.R.string.ok, null)
+            .setItems(actions, (dialog, which) -> {
+                if (which == 0) {
+                    reconnect();
+                } else if (which == 1) {
+                    resolvePublicIp(true);
+                } else if (which == 2) {
+                    startActivity(new Intent(this, LogsActivity.class));
+                } else {
+                    new AlertDialog.Builder(this)
+                        .setTitle(R.string.app_name)
+                        .setMessage(getString(R.string.app_information)
+                            + "\nXray-core: " + XrayBridge.version())
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show();
+                }
+            })
             .show();
+    }
+
+    private void reconnect() {
+        if (!profileStore.hasActiveProfile()) {
+            showImportDialog();
+            return;
+        }
+        if (H2RayVpnService.isRunning() || H2RayVpnService.isBusy()) {
+            startService(H2RayVpnService.stopIntent(this));
+            handler.postDelayed(this::startVpn, 1200);
+        } else {
+            toggleConnection();
+        }
     }
 
     private void showScreen(String target) {
         homeScreen.setVisibility("home".equals(target) ? View.VISIBLE : View.GONE);
         profilesScreen.setVisibility("profiles".equals(target) ? View.VISIBLE : View.GONE);
+        rulesScreen.setVisibility("rules".equals(target) ? View.VISIBLE : View.GONE);
         settingsScreen.setVisibility("settings".equals(target) ? View.VISIBLE : View.GONE);
         setNavColor(R.id.nav_home, "home".equals(target));
         setNavColor(R.id.nav_profiles, "profiles".equals(target));
-        setNavColor(R.id.nav_rules, false);
+        setNavColor(R.id.nav_rules, "rules".equals(target));
         setNavColor(R.id.nav_settings, "settings".equals(target));
         if ("profiles".equals(target)) {
             renderProfiles();
         }
         if ("settings".equals(target)) {
             renderSettings();
+        }
+        if ("rules".equals(target)) {
+            renderRules();
         }
     }
 
@@ -365,31 +428,23 @@ public final class MainActivity extends Activity {
     }
 
     private void configureSettings() {
-        Switch bypassRu = findViewById(R.id.setting_bypass_ru);
-        Switch bypassPrivate = findViewById(R.id.setting_bypass_private);
         Switch ipv6 = findViewById(R.id.setting_ipv6);
-        bypassRu.setOnCheckedChangeListener((button, value) -> {
-            appSettings.setBypassRu(value);
-            settingsChanged();
-        });
-        bypassPrivate.setOnCheckedChangeListener((button, value) -> {
-            appSettings.setBypassPrivate(value);
-            settingsChanged();
-        });
         ipv6.setOnCheckedChangeListener((button, value) -> {
             appSettings.setIpv6(value);
             settingsChanged();
         });
         findViewById(R.id.setting_dns).setOnClickListener(view -> chooseDns());
+        findViewById(R.id.setting_mtu).setOnClickListener(view -> chooseMtu());
         renderSettings();
     }
 
     private void renderSettings() {
-        ((Switch) findViewById(R.id.setting_bypass_ru)).setChecked(appSettings.bypassRu());
-        ((Switch) findViewById(R.id.setting_bypass_private)).setChecked(appSettings.bypassPrivate());
         ((Switch) findViewById(R.id.setting_ipv6)).setChecked(appSettings.ipv6());
         ((TextView) findViewById(R.id.setting_dns)).setText(
             getString(R.string.dns_label, appSettings.dns())
+        );
+        ((TextView) findViewById(R.id.setting_mtu)).setText(
+            getString(R.string.mtu_label, appSettings.mtu())
         );
     }
 
@@ -400,6 +455,81 @@ public final class MainActivity extends Activity {
             .setItems(values, (dialog, which) -> {
                 appSettings.setDns(values[which]);
                 renderSettings();
+                settingsChanged();
+            })
+            .show();
+    }
+
+    private void chooseMtu() {
+        int[] values = {1280, 1400, 1500};
+        String[] labels = {"1280", "1400", "1500"};
+        new AlertDialog.Builder(this)
+            .setTitle("MTU")
+            .setItems(labels, (dialog, which) -> {
+                appSettings.setMtu(values[which]);
+                renderSettings();
+                settingsChanged();
+            })
+            .show();
+    }
+
+    private void configureRules() {
+        Switch bypassRu = findViewById(R.id.rule_bypass_ru);
+        Switch bypassPrivate = findViewById(R.id.rule_bypass_private);
+        Switch blockAds = findViewById(R.id.rule_block_ads);
+        Switch blockQuic = findViewById(R.id.rule_block_quic);
+        Switch sniffing = findViewById(R.id.rule_sniffing);
+        bypassRu.setOnCheckedChangeListener((button, value) -> {
+            appSettings.setBypassRu(value);
+            settingsChanged();
+        });
+        bypassPrivate.setOnCheckedChangeListener((button, value) -> {
+            appSettings.setBypassPrivate(value);
+            settingsChanged();
+        });
+        blockAds.setOnCheckedChangeListener((button, value) -> {
+            appSettings.setBlockAds(value);
+            settingsChanged();
+        });
+        blockQuic.setOnCheckedChangeListener((button, value) -> {
+            appSettings.setBlockQuic(value);
+            settingsChanged();
+        });
+        sniffing.setOnCheckedChangeListener((button, value) -> {
+            appSettings.setSniffing(value);
+            settingsChanged();
+        });
+        findViewById(R.id.rule_mode).setOnClickListener(view -> chooseRoutingMode());
+        renderRules();
+    }
+
+    private void renderRules() {
+        ((Switch) findViewById(R.id.rule_bypass_ru)).setChecked(appSettings.bypassRu());
+        ((Switch) findViewById(R.id.rule_bypass_private)).setChecked(appSettings.bypassPrivate());
+        ((Switch) findViewById(R.id.rule_block_ads)).setChecked(appSettings.blockAds());
+        ((Switch) findViewById(R.id.rule_block_quic)).setChecked(appSettings.blockQuic());
+        ((Switch) findViewById(R.id.rule_sniffing)).setChecked(appSettings.sniffing());
+        String mode = appSettings.routingMode();
+        int label = "global".equals(mode)
+            ? R.string.routing_global
+            : "direct".equals(mode) ? R.string.routing_direct : R.string.routing_rules;
+        ((TextView) findViewById(R.id.rule_mode)).setText(
+            getString(R.string.routing_mode_label, getString(label))
+        );
+    }
+
+    private void chooseRoutingMode() {
+        String[] labels = {
+            getString(R.string.routing_global),
+            getString(R.string.routing_rules),
+            getString(R.string.routing_direct)
+        };
+        String[] values = {"global", "rules", "direct"};
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.rules_title)
+            .setItems(labels, (dialog, which) -> {
+                appSettings.setRoutingMode(values[which]);
+                renderRules();
                 settingsChanged();
             })
             .show();
@@ -454,6 +584,128 @@ public final class MainActivity extends Activity {
         root.requestApplyInsets();
     }
 
+    private void configureNavigationLabels() {
+        enlargeNavigationIcon(R.id.nav_home);
+        enlargeNavigationIcon(R.id.nav_profiles);
+        enlargeNavigationIcon(R.id.nav_rules);
+        enlargeNavigationIcon(R.id.nav_settings);
+    }
+
+    private void enlargeNavigationIcon(int viewId) {
+        TextView view = findViewById(viewId);
+        SpannableString text = new SpannableString(view.getText());
+        int lineBreak = text.toString().indexOf('\n');
+        int end = lineBreak < 0 ? Math.min(1, text.length()) : lineBreak;
+        text.setSpan(
+            new RelativeSizeSpan(1.45f),
+            0,
+            end,
+            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+        );
+        view.setText(text);
+    }
+
+    private void renderStats(boolean running) {
+        if (!running) {
+            statDownload.setText("—");
+            statUpload.setText("—");
+            statIp.setText("—");
+            return;
+        }
+
+        long rx = TrafficStats.getUidRxBytes(Process.myUid());
+        long tx = TrafficStats.getUidTxBytes(Process.myUid());
+        long download = rx == TrafficStats.UNSUPPORTED
+            ? 0 : Math.max(0, rx - connectionStatusStore.getRxBase());
+        long upload = tx == TrafficStats.UNSUPPORTED
+            ? 0 : Math.max(0, tx - connectionStatusStore.getTxBase());
+        statDownload.setText(formatBytes(download));
+        statUpload.setText(formatBytes(upload));
+        String publicIp = connectionStatusStore.getPublicIp();
+        statIp.setText(publicIp.trim().isEmpty() ? "…" : publicIp);
+        if (publicIp.trim().isEmpty()) {
+            resolvePublicIp(false);
+        }
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes < 1024) {
+            return bytes + " B";
+        }
+        double value = bytes / 1024.0;
+        if (value < 1024) {
+            return String.format(Locale.ROOT, "%.1f KB", value);
+        }
+        value /= 1024.0;
+        if (value < 1024) {
+            return String.format(Locale.ROOT, "%.1f MB", value);
+        }
+        return String.format(Locale.ROOT, "%.2f GB", value / 1024.0);
+    }
+
+    private void resolvePublicIp(boolean force) {
+        if (!H2RayVpnService.isRunning()) {
+            if (force) {
+                Toast.makeText(this, R.string.ip_check_failed, Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
+        if (!force && !connectionStatusStore.getPublicIp().trim().isEmpty()) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (!force && now - lastIpAttempt < 30000) {
+            return;
+        }
+        if (!ipLookupRunning.compareAndSet(false, true)) {
+            return;
+        }
+        lastIpAttempt = now;
+        executor.execute(() -> {
+            String ip = queryIp("https://api.ipify.org");
+            if (ip.isEmpty()) {
+                ip = queryIp("https://api64.ipify.org");
+            }
+            final String result = ip;
+            if (!result.isEmpty()) {
+                connectionStatusStore.setPublicIp(result);
+            }
+            ipLookupRunning.set(false);
+            runOnUiThread(() -> {
+                renderStats(H2RayVpnService.isRunning());
+                if (force && result.isEmpty()) {
+                    Toast.makeText(this, R.string.ip_check_failed, Toast.LENGTH_SHORT).show();
+                }
+            });
+        });
+    }
+
+    private String queryIp(String endpoint) {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(endpoint).openConnection();
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(5000);
+            connection.setUseCaches(false);
+            connection.setRequestProperty("User-Agent", "H2Ray/0.1");
+            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                return "";
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                connection.getInputStream(), StandardCharsets.UTF_8
+            ))) {
+                String value = reader.readLine();
+                return value == null ? "" : value.trim();
+            }
+        } catch (Exception ignored) {
+            return "";
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
     private void render() {
         boolean running = H2RayVpnService.isRunning();
         boolean hasProfile = profileStore.hasActiveProfile();
@@ -474,6 +726,7 @@ public final class MainActivity extends Activity {
         profileName.setText(hasProfile ? profileStore.getName() : getString(R.string.no_profile));
         profileDetails.setText(hasProfile ? profileStore.getProtocol() : getString(R.string.import_required));
         importButton.setText(R.string.add_profile);
+        renderStats(running);
     }
 
     private void requestNotificationPermissionIfNeeded() {

@@ -42,4 +42,44 @@ public final class AppSettings {
     public void setDns(String value) {
         preferences.edit().putString("dns", value).apply();
     }
+
+    public int mtu() {
+        return preferences.getInt("mtu", 1500);
+    }
+
+    public void setMtu(int value) {
+        preferences.edit().putInt("mtu", value).apply();
+    }
+
+    public String routingMode() {
+        return preferences.getString("routing_mode", "rules");
+    }
+
+    public void setRoutingMode(String value) {
+        preferences.edit().putString("routing_mode", value).apply();
+    }
+
+    public boolean blockAds() {
+        return preferences.getBoolean("block_ads", false);
+    }
+
+    public void setBlockAds(boolean value) {
+        preferences.edit().putBoolean("block_ads", value).apply();
+    }
+
+    public boolean blockQuic() {
+        return preferences.getBoolean("block_quic", false);
+    }
+
+    public void setBlockQuic(boolean value) {
+        preferences.edit().putBoolean("block_quic", value).apply();
+    }
+
+    public boolean sniffing() {
+        return preferences.getBoolean("sniffing", true);
+    }
+
+    public void setSniffing(boolean value) {
+        preferences.edit().putBoolean("sniffing", value).apply();
+    }
 }

@@ -54,11 +54,11 @@ public final class XrayConfigFactory {
             .put("protocol", "tun")
             .put("settings", new JSONObject()
                 .put("name", "h2ray0")
-                .put("mtu", 1500)
+                .put("mtu", settings.mtu())
                 .put("gateway", new JSONArray().put("10.10.0.1/30"))
                 .put("dns", new JSONArray().put(settings.dns())));
         tunInbound.put("sniffing", new JSONObject()
-            .put("enabled", true)
+            .put("enabled", settings.sniffing())
             .put("routeOnly", true)
             .put("destOverride", new JSONArray().put("http").put("tls").put("quic")));
 
@@ -69,18 +69,34 @@ public final class XrayConfigFactory {
         config.put("inbounds", new JSONArray().put(tunInbound));
         config.put("outbounds", runtimeOutbounds);
         JSONArray rules = new JSONArray();
-        if (settings.bypassPrivate()) {
+        if (settings.blockAds()) {
+            rules.put(new JSONObject()
+                .put("type", "field")
+                .put("domain", new JSONArray().put("geosite:category-ads-all"))
+                .put("outboundTag", "block"));
+        }
+        if (settings.blockQuic()) {
+            rules.put(new JSONObject()
+                .put("type", "field")
+                .put("network", "udp")
+                .put("port", "443")
+                .put("outboundTag", "block"));
+        }
+        if ("direct".equals(settings.routingMode())) {
+            rules.put(new JSONObject()
+                .put("type", "field")
+                .put("network", "tcp,udp")
+                .put("outboundTag", "direct"));
+        } else if ("rules".equals(settings.routingMode()) && settings.bypassPrivate()) {
             rules.put(new JSONObject()
                 .put("type", "field")
                 .put("ip", privateNetworks)
                 .put("outboundTag", "direct"));
         }
-        if (settings.bypassRu()) {
+        if ("rules".equals(settings.routingMode()) && settings.bypassRu()) {
             rules.put(new JSONObject()
                 .put("type", "field")
                 .put("domain", new JSONArray()
-                    .put("geosite:category-bank-ru")
-                    .put("geosite:category-gov-ru")
                     .put("geosite:category-ru")
                     .put("regexp:\\.ru$"))
                 .put("outboundTag", "direct"));

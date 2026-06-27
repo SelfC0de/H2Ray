@@ -38,6 +38,10 @@ public final class XrayBridge {
         });
     }
 
+    public static void clearSocketProtection() {
+        registerSocketProtection(fileDescriptor -> false);
+    }
+
     public static void setTunFd(int fileDescriptor) {
         LibXray.setTunFd(fileDescriptor);
     }
@@ -54,6 +58,10 @@ public final class XrayBridge {
 
     public static void stop() throws Exception {
         requireSuccess(LibXray.stopXray());
+    }
+
+    public static boolean isRunning() {
+        return LibXray.getXrayState();
     }
 
     public static String version() {

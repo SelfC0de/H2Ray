@@ -200,7 +200,10 @@
                     android:gravity="center"
                     android:orientation="vertical">
                     <TextView style="@style/H2RayStatLabel" android:text="@string/download" />
-                    <TextView style="@style/H2RayStatValue" android:text="—" />
+                    <TextView
+                        android:id="@+id/stat_download"
+                        style="@style/H2RayStatValue"
+                        android:text="—" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -213,7 +216,10 @@
                     android:gravity="center"
                     android:orientation="vertical">
                     <TextView style="@style/H2RayStatLabel" android:text="@string/upload" />
-                    <TextView style="@style/H2RayStatValue" android:text="—" />
+                    <TextView
+                        android:id="@+id/stat_upload"
+                        style="@style/H2RayStatValue"
+                        android:text="—" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -225,7 +231,12 @@
                     android:gravity="center"
                     android:orientation="vertical">
                     <TextView style="@style/H2RayStatLabel" android:text="IP" />
-                    <TextView style="@style/H2RayStatValue" android:text="—" />
+                    <TextView
+                        android:id="@+id/stat_ip"
+                        style="@style/H2RayStatValue"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="—" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -295,6 +306,114 @@
     </LinearLayout>
 
     <ScrollView
+        android:id="@+id/rules_screen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/background"
+        android:fillViewport="true"
+        android:paddingBottom="84dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:gravity="center_vertical"
+                android:text="@string/rules_title"
+                android:textColor="@color/text_primary"
+                android:textSize="23sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/rule_mode"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:background="@drawable/bg_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
+            <Switch
+                android:id="@+id/rule_bypass_ru"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/bypass_ru"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
+            <Switch
+                android:id="@+id/rule_bypass_private"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/bypass_private"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
+            <Switch
+                android:id="@+id/rule_block_ads"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/block_ads"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
+            <Switch
+                android:id="@+id/rule_block_quic"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/block_quic"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
+            <Switch
+                android:id="@+id/rule_sniffing"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/domain_sniffing"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/rules_restart_note"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </ScrollView>
+
+    <ScrollView
         android:id="@+id/settings_screen"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -323,33 +442,10 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:text="@string/routing_section"
+                android:text="@string/connection_section"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
                 android:textStyle="bold" />
-
-            <Switch
-                android:id="@+id/setting_bypass_ru"
-                android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:background="@drawable/bg_card"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:text="@string/bypass_ru"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp" />
-
-            <Switch
-                android:id="@+id/setting_bypass_private"
-                android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_card"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:text="@string/bypass_private"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp" />
 
             <Switch
                 android:id="@+id/setting_ipv6"
@@ -365,6 +461,20 @@
 
             <TextView
                 android:id="@+id/setting_dns"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/setting_mtu"
                 android:layout_width="match_parent"
                 android:layout_height="64dp"
                 android:layout_marginTop="8dp"
@@ -406,7 +516,7 @@
     <LinearLayout
         android:id="@+id/bottom_navigation"
         android:layout_width="match_parent"
-        android:layout_height="66dp"
+        android:layout_height="74dp"
         android:layout_gravity="bottom"
         android:background="@color/navigation"
         android:gravity="center"
