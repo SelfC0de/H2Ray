@@ -163,7 +163,9 @@ public final class MainActivity extends Activity {
     private final Runnable stateUpdater = new Runnable() {
         @Override
         public void run() {
-            render();
+            if (homeScreen != null && homeScreen.getVisibility() == View.VISIBLE) {
+                render();
+            }
             renderUpdateDownload(updateDownloadManager.state());
             handler.postDelayed(this, 1000);
         }
@@ -1027,6 +1029,17 @@ public final class MainActivity extends Activity {
             startHomeAnimations();
         } else {
             stopHomeAnimations();
+            View targetView = "profiles".equals(target)
+                ? profilesScreen
+                : "rules".equals(target) ? rulesScreen : settingsScreen;
+            targetView.setAlpha(0f);
+            targetView.setTranslationX(dp(10));
+            targetView.animate()
+                .alpha(1f)
+                .translationX(0f)
+                .setDuration(240)
+                .setInterpolator(new AccelerateDecelerateInterpolator())
+                .start();
         }
         if ("profiles".equals(target)) {
             renderProfiles();
@@ -1787,16 +1800,23 @@ public final class MainActivity extends Activity {
     }
 
     private void chooseBypassApps() {
-        List<ApplicationInfo> installed =
-            getPackageManager().getInstalledApplications(PackageManager.GET_META_DATA);
-        List<ApplicationInfo> apps = new ArrayList<>();
-        for (ApplicationInfo item : installed) {
-            if (!getPackageName().equals(item.packageName)) {
-                apps.add(item);
+        Toast.makeText(this, R.string.scanning_apps, Toast.LENGTH_SHORT).show();
+        executor.execute(() -> {
+            List<ApplicationInfo> installed =
+                getPackageManager().getInstalledApplications(PackageManager.GET_META_DATA);
+            List<ApplicationInfo> apps = new ArrayList<>();
+            for (ApplicationInfo item : installed) {
+                if (!getPackageName().equals(item.packageName)) {
+                    apps.add(item);
+                }
             }
-        }
-        apps.sort(Comparator.comparing(item ->
-            item.loadLabel(getPackageManager()).toString().toLowerCase(Locale.ROOT)));
+            apps.sort(Comparator.comparing(item ->
+                item.loadLabel(getPackageManager()).toString().toLowerCase(Locale.ROOT)));
+            runOnUiThread(() -> showBypassAppsDialog(apps));
+        });
+    }
+
+    private void showBypassAppsDialog(List<ApplicationInfo> apps) {
         String[] labels = new String[apps.size()];
         boolean[] checked = new boolean[apps.size()];
         Set<String> selected = new LinkedHashSet<>(appSettings.bypassApps());
@@ -1831,8 +1851,22 @@ public final class MainActivity extends Activity {
     }
 
     private void setViewsVisible(boolean visible, int... ids) {
-        for (int id : ids) {
-            findViewById(id).setVisibility(visible ? View.VISIBLE : View.GONE);
+        for (int index = 0; index < ids.length; index++) {
+            View item = findViewById(ids[index]);
+            item.animate().cancel();
+            if (!visible) {
+                item.setVisibility(View.GONE);
+                continue;
+            }
+            item.setVisibility(View.VISIBLE);
+            item.setAlpha(0f);
+            item.setTranslationY(-dp(4));
+            item.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setStartDelay(Math.min(index * 22L, 110L))
+                .setDuration(180)
+                .start();
         }
     }
 

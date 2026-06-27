@@ -28,8 +28,6 @@
     <string name="nav_rules">⌁\nПравила</string>
     <string name="nav_settings">⚙\nНастройки</string>
     <string name="home_opened">Вы уже на главном экране</string>
-    <string name="rules_next_stage">Редактор правил будет добавлен на следующем этапе</string>
-    <string name="settings_next_stage">Настройки будут добавлены на следующем этапе</string>
     <string name="about_developer">Dev by SelfCode</string>
     <string name="about_vk">VK · selfcode_dev</string>
     <string name="about_telegram">Telegram · selfcode_dev</string>
@@ -48,12 +46,9 @@
     <string name="no_profiles">Профилей пока нет</string>
     <string name="ping_requires_disconnect">Для точного пинга сначала отключите VPN</string>
     <string name="ping_failed">Ошибка</string>
-    <string name="routing_section">МАРШРУТИЗАЦИЯ</string>
-    <string name="connection_section">ПОДКЛЮЧЕНИЕ</string>
     <string name="bypass_ru">RU-сайты и банки напрямую</string>
     <string name="bypass_private">Локальная сеть напрямую</string>
     <string name="enable_ipv6">Маршрутизировать IPv6</string>
-    <string name="diagnostics_section">ДИАГНОСТИКА</string>
     <string name="dns_label">DNS: %1$s</string>
     <string name="mtu_label">MTU: %1$d</string>
     <string name="routing_mode_label">Режим: %1$s</string>
@@ -74,7 +69,6 @@
     <string name="reconnect_settings">Изменения применятся после переподключения</string>
     <string name="update_available">Доступно обязательное обновление</string>
     <string name="update_app">Обновить приложение</string>
-    <string name="updates_section">ОБНОВЛЕНИЯ</string>
     <string name="checking_update">Проверка обновления…</string>
     <string name="no_update">Установлена актуальная версия</string>
     <string name="update_check_failed">Не удалось проверить обновление</string>
@@ -85,7 +79,6 @@
     <string name="update_verification_failed">Проверка подписи обновления не пройдена</string>
     <string name="update_install">Установить обновление</string>
     <string name="update_permission">Разрешите установку обновлений H2Ray</string>
-    <string name="profiles_count">Добавленные серверы: %1$d</string>
     <string name="ping_checking">Проверка…</string>
     <string name="profiles_menu">Действия с профилями</string>
     <string name="import_file">Импортировать .txt или .json</string>
@@ -144,4 +137,5 @@
     <string name="custom_domains">Домены, IP, GeoIP и GeoSite</string>
     <string name="custom_domains_hint">По одному правилу в строке: domain:example.com, 1.2.3.0/24, geoip:ru или geosite:category-ads-all</string>
     <string name="bypass_apps">Приложения вне VPN</string>
+    <string name="scanning_apps">Сканирование установленных приложений…</string>
 </resources>

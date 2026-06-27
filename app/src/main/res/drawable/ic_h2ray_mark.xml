@@ -4,6 +4,10 @@
     android:height="36dp"
     android:viewportWidth="36"
     android:viewportHeight="36">
+    <group
+        android:name="logo"
+        android:pivotX="18"
+        android:pivotY="18">
     <path
         android:fillColor="#09111F"
         android:pathData="M8,1L28,1A7,7 0,0 1,35 8L35,28A7,7 0,0 1,28 35L8,35A7,7 0,0 1,1 28L1,8A7,7 0,0 1,8 1Z"
@@ -15,4 +19,5 @@
     <path
         android:fillColor="#218CFF"
         android:pathData="M22,10L27,10C29.8,10 31,11.7 31,14C31,16 29.8,17.2 28.4,18L31.5,26L28.2,26L25.6,19L25,19L25,26L22,26ZM25,13L25,16L26.8,16C27.6,16 28,15.4 28,14.5C28,13.6 27.5,13 26.7,13Z" />
+    </group>
 </vector>

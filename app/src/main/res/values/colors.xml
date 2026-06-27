@@ -2,10 +2,13 @@
 <resources>
     <color name="background">#060B16</color>
     <color name="surface">#0F1A2C</color>
+    <color name="surface_elevated">#15243A</color>
+    <color name="surface_soft">#0A1424</color>
     <color name="border">#26354B</color>
     <color name="text_primary">#F1F6FF</color>
     <color name="text_secondary">#8292AA</color>
     <color name="accent">#19D7E4</color>
+    <color name="accent_dim">#4D19D7E4</color>
     <color name="success">#42D69B</color>
     <color name="error">#FF6F7D</color>
     <color name="navigation">#F5070D19</color>
