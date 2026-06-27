@@ -15,6 +15,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.InputType;
 import android.view.View;
+import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -68,6 +69,18 @@ public final class MainActivity extends Activity {
         connectButton.setOnClickListener(view -> toggleConnection());
         importButton.setOnClickListener(view -> showImportDialog());
         findViewById(R.id.profile_card).setOnClickListener(view -> showProfileActions());
+        findViewById(R.id.header_menu_button).setOnClickListener(view -> showAppMenu());
+        findViewById(R.id.nav_home).setOnClickListener(
+            view -> Toast.makeText(this, R.string.home_opened, Toast.LENGTH_SHORT).show()
+        );
+        findViewById(R.id.nav_profiles).setOnClickListener(view -> showProfileActions());
+        findViewById(R.id.nav_rules).setOnClickListener(
+            view -> Toast.makeText(this, R.string.rules_next_stage, Toast.LENGTH_SHORT).show()
+        );
+        findViewById(R.id.nav_settings).setOnClickListener(
+            view -> Toast.makeText(this, R.string.settings_next_stage, Toast.LENGTH_SHORT).show()
+        );
+        applySystemBarInsets();
         requestNotificationPermissionIfNeeded();
         render();
     }
@@ -210,6 +223,35 @@ public final class MainActivity extends Activity {
                 }
             })
             .show();
+    }
+
+    private void showAppMenu() {
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.app_name)
+            .setMessage(R.string.app_information)
+            .setPositiveButton(android.R.string.ok, null)
+            .show();
+    }
+
+    private void applySystemBarInsets() {
+        View root = findViewById(R.id.app_root);
+        root.setOnApplyWindowInsetsListener((view, insets) -> {
+            int top;
+            int bottom;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                android.graphics.Insets bars = insets.getInsets(
+                    WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars()
+                );
+                top = bars.top;
+                bottom = bars.bottom;
+            } else {
+                top = insets.getSystemWindowInsetTop();
+                bottom = insets.getSystemWindowInsetBottom();
+            }
+            view.setPadding(0, top, 0, bottom);
+            return insets;
+        });
+        root.requestApplyInsets();
     }
 
     private void render() {

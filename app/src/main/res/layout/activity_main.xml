@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/app_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background">
@@ -49,8 +50,12 @@
                     android:layout_weight="1" />
 
                 <TextView
+                    android:id="@+id/header_menu_button"
                     android:layout_width="40dp"
                     android:layout_height="40dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true"
                     android:gravity="center"
                     android:text="•••"
                     android:textColor="@color/text_secondary"
@@ -234,6 +239,7 @@
     </ScrollView>
 
     <LinearLayout
+        android:id="@+id/bottom_navigation"
         android:layout_width="match_parent"
         android:layout_height="66dp"
         android:layout_gravity="bottom"
@@ -243,9 +249,21 @@
         android:paddingStart="8dp"
         android:paddingEnd="8dp">
 
-        <TextView style="@style/H2RayNavItemActive" android:text="@string/nav_home" />
-        <TextView style="@style/H2RayNavItem" android:text="@string/nav_profiles" />
-        <TextView style="@style/H2RayNavItem" android:text="@string/nav_rules" />
-        <TextView style="@style/H2RayNavItem" android:text="@string/nav_settings" />
+        <TextView
+            android:id="@+id/nav_home"
+            style="@style/H2RayNavItemActive"
+            android:text="@string/nav_home" />
+        <TextView
+            android:id="@+id/nav_profiles"
+            style="@style/H2RayNavItem"
+            android:text="@string/nav_profiles" />
+        <TextView
+            android:id="@+id/nav_rules"
+            style="@style/H2RayNavItem"
+            android:text="@string/nav_rules" />
+        <TextView
+            android:id="@+id/nav_settings"
+            style="@style/H2RayNavItem"
+            android:text="@string/nav_settings" />
     </LinearLayout>
 </FrameLayout>

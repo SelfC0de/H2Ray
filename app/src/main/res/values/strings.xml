@@ -27,4 +27,8 @@
     <string name="nav_profiles">▤\nПрофили</string>
     <string name="nav_rules">⌁\nПравила</string>
     <string name="nav_settings">⚙\nНастройки</string>
+    <string name="home_opened">Вы уже на главном экране</string>
+    <string name="rules_next_stage">Редактор правил будет добавлен на следующем этапе</string>
+    <string name="settings_next_stage">Настройки будут добавлены на следующем этапе</string>
+    <string name="app_information">H2Ray\nPackage: com.h2ray.app\nCore: XTLS/libXray</string>
 </resources>
