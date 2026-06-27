@@ -48,6 +48,12 @@ public final class XrayConfigFactory {
             .put("203.0.113.0/24")
             .put("224.0.0.0/4")
             .put("240.0.0.0/4");
+        if (settings.ipv6()) {
+            privateNetworks
+                .put("::1/128")
+                .put("fc00::/7")
+                .put("fe80::/10");
+        }
 
         JSONObject tunInbound = new JSONObject()
             .put("tag", "tun-in")
@@ -55,7 +61,9 @@ public final class XrayConfigFactory {
             .put("settings", new JSONObject()
                 .put("name", "h2ray0")
                 .put("mtu", settings.mtu())
-                .put("gateway", new JSONArray().put("10.10.0.1/30"))
+                .put("gateway", new JSONArray()
+                    .put("10.10.0.1/30")
+                    .put("fd00:10:10::1/126"))
                 .put("dns", new JSONArray().put(settings.dns())));
         tunInbound.put("sniffing", new JSONObject()
             .put("enabled", settings.sniffing())
@@ -69,6 +77,12 @@ public final class XrayConfigFactory {
         config.put("inbounds", new JSONArray().put(tunInbound));
         config.put("outbounds", runtimeOutbounds);
         JSONArray rules = new JSONArray();
+        if (!settings.ipv6()) {
+            rules.put(new JSONObject()
+                .put("type", "field")
+                .put("ip", new JSONArray().put("::/0"))
+                .put("outboundTag", "block"));
+        }
         if (settings.blockAds()) {
             rules.put(new JSONObject()
                 .put("type", "field")

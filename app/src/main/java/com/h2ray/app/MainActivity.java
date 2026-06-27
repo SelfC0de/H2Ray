@@ -32,18 +32,14 @@ import android.widget.Toast;
 import com.h2ray.app.data.ProfileStore;
 import com.h2ray.app.data.ConnectionStatusStore;
 import com.h2ray.app.data.AppSettings;
+import com.h2ray.app.network.PublicIpResolver;
 import com.h2ray.app.vpn.H2RayVpnService;
 import com.h2ray.app.xray.XrayBridge;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.net.InetSocketAddress;
-import java.net.HttpURLConnection;
 import java.net.Socket;
-import java.net.URL;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -662,10 +658,7 @@ public final class MainActivity extends Activity {
         }
         lastIpAttempt = now;
         executor.execute(() -> {
-            String ip = queryIp("https://api.ipify.org");
-            if (ip.isEmpty()) {
-                ip = queryIp("https://api64.ipify.org");
-            }
+            String ip = PublicIpResolver.resolve();
             final String result = ip;
             if (!result.isEmpty()) {
                 connectionStatusStore.setPublicIp(result);
@@ -678,32 +671,6 @@ public final class MainActivity extends Activity {
                 }
             });
         });
-    }
-
-    private String queryIp(String endpoint) {
-        HttpURLConnection connection = null;
-        try {
-            connection = (HttpURLConnection) new URL(endpoint).openConnection();
-            connection.setConnectTimeout(5000);
-            connection.setReadTimeout(5000);
-            connection.setUseCaches(false);
-            connection.setRequestProperty("User-Agent", "H2Ray/0.1");
-            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
-                return "";
-            }
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                connection.getInputStream(), StandardCharsets.UTF_8
-            ))) {
-                String value = reader.readLine();
-                return value == null ? "" : value.trim();
-            }
-        } catch (Exception ignored) {
-            return "";
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
-        }
     }
 
     private void render() {

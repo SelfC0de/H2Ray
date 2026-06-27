@@ -20,6 +20,7 @@ import com.h2ray.app.data.AppSettings;
 import com.h2ray.app.data.ConnectionStatusStore;
 import com.h2ray.app.data.LogStore;
 import com.h2ray.app.data.ProfileStore;
+import com.h2ray.app.network.PublicIpResolver;
 import com.h2ray.app.xray.XrayBridge;
 import com.h2ray.app.xray.XrayConfigFactory;
 
@@ -47,6 +48,7 @@ public final class H2RayVpnService extends VpnService {
         new AtomicReference<>(CoreState.STOPPED);
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService ipExecutor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean cancelStart = new AtomicBoolean(false);
     private final Object lifecycleLock = new Object();
     private ParcelFileDescriptor vpnInterface;
@@ -130,10 +132,8 @@ public final class H2RayVpnService extends VpnService {
                     .addAddress("10.10.0.2", 30)
                     .addRoute("0.0.0.0", 0)
                     .addDnsServer(settings.dns());
-                if (settings.ipv6()) {
-                    builder.addAddress("fd00:10:10::2", 126)
-                        .addRoute("::", 0);
-                }
+                builder.addAddress("fd00:10:10::2", 126)
+                    .addRoute("::", 0);
 
                 vpnInterface = builder.establish();
                 if (vpnInterface == null) {
@@ -160,6 +160,7 @@ public final class H2RayVpnService extends VpnService {
                 updateNotification(getString(R.string.connected));
                 logStore.add("INFO", "Xray запущен: " + XrayBridge.version());
                 Log.i(TAG, "Xray tunnel started, core=" + XrayBridge.version());
+                ipExecutor.execute(this::resolvePublicIp);
             }
         } catch (Throwable error) {
             Log.e(TAG, "Unable to start tunnel", error);
@@ -241,6 +242,7 @@ public final class H2RayVpnService extends VpnService {
             }
         }
         executor.shutdownNow();
+        ipExecutor.shutdownNow();
         super.onDestroy();
     }
 
@@ -251,6 +253,24 @@ public final class H2RayVpnService extends VpnService {
 
     private long safeTrafficValue(long value) {
         return value == TrafficStats.UNSUPPORTED ? 0 : Math.max(0, value);
+    }
+
+    private void resolvePublicIp() {
+        try {
+            Thread.sleep(750);
+            if (CORE_STATE.get() != CoreState.RUNNING) {
+                return;
+            }
+            String ip = PublicIpResolver.resolve();
+            if (!ip.isEmpty() && CORE_STATE.get() == CoreState.RUNNING) {
+                connectionStatus.setPublicIp(ip);
+                logStore.add("INFO", "Внешний IP определён");
+            } else {
+                logStore.add("WARN", "Сервис внешнего IP недоступен");
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void copyCoreAsset(String name) throws IOException {
