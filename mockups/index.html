@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#060b16">
+  <title>H2Ray — UI prototype</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="app" class="app-shell">
+    <header class="topbar">
+      <button class="icon-button back-button hidden" type="button" aria-label="Назад" data-action="back">
+        <span>‹</span>
+      </button>
+      <div class="brand" data-action="navigate" data-target="home">
+        <img src="../H2Ray_logo.png" alt="">
+        <span>H2Ray</span>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-button" type="button" aria-label="Сканировать QR-код" data-action="open-add" data-mode="qr">
+          <span class="qr-icon" aria-hidden="true"></span>
+        </button>
+        <button class="icon-button overflow-button" type="button" aria-label="Дополнительно" data-action="toast" data-message="Дополнительное меню">
+          <span>•••</span>
+        </button>
+      </div>
+    </header>
+
+    <section id="screen" class="screen" aria-live="polite"></section>
+
+    <nav class="bottom-nav" aria-label="Основная навигация">
+      <button class="nav-item active" type="button" data-action="navigate" data-target="home">
+        <span class="nav-icon">⌂</span>
+        <span>Главная</span>
+      </button>
+      <button class="nav-item" type="button" data-action="navigate" data-target="profiles">
+        <span class="nav-icon">▤</span>
+        <span>Профили</span>
+      </button>
+      <button class="nav-item" type="button" data-action="navigate" data-target="routing">
+        <span class="nav-icon">⌁</span>
+        <span>Правила</span>
+      </button>
+      <button class="nav-item" type="button" data-action="navigate" data-target="settings">
+        <span class="nav-icon">⚙</span>
+        <span>Настройки</span>
+      </button>
+    </nav>
+  </main>
+
+  <div id="sheet-backdrop" class="sheet-backdrop hidden" data-action="close-sheet"></div>
+  <aside id="sheet" class="sheet hidden" role="dialog" aria-modal="true"></aside>
+  <div id="toast" class="toast hidden" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
