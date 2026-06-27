@@ -10,4 +10,7 @@
     <color name="error">#FF6F7D</color>
     <color name="navigation">#F5070D19</color>
     <color name="launcher_background">#060B16</color>
+    <color name="splash_blue">#102C50</color>
+    <color name="update_background">#38220A</color>
+    <color name="update_border">#FFB84D</color>
 </resources>

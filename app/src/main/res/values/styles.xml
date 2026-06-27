@@ -9,6 +9,10 @@
         <item name="android:colorAccent">@color/accent</item>
     </style>
 
+    <style name="Theme.H2Ray.Launcher" parent="Theme.H2Ray">
+        <item name="android:windowBackground">@drawable/bg_splash</item>
+    </style>
+
     <style name="H2RayStatLabel">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>

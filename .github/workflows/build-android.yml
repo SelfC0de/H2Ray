@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       version_name:
-        description: Public version (for example 0.2.0)
+        description: Public version (for example 1.0.0.0)
         required: true
-        default: "0.2.0"
+        default: "1.0.0.0"
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-build-${{ github.ref }}
@@ -74,6 +74,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.H2RAY_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.H2RAY_KEY_PASSWORD }}
         run: |
+          [[ "${{ inputs.version_name }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
           test -n "$KEYSTORE_BASE64"
           test -n "$KEYSTORE_PASSWORD"
           test -n "$KEY_ALIAS"
@@ -112,3 +113,21 @@ jobs:
           path: output/H2Ray.apk
           if-no-files-found: error
           retention-days: 1
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ inputs.version_name }}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" output/H2Ray.apk \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          else
+            gh release create "$TAG" output/H2Ray.apk \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "H2Ray ${{ inputs.version_name }}" \
+              --generate-notes
+          fi

@@ -63,6 +63,21 @@
                     android:textSize="16sp" />
             </LinearLayout>
 
+            <TextView
+                android:id="@+id/update_badge"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_update_badge"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="@string/update_available"
+                android:textColor="@color/update_border"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="286dp"
@@ -511,6 +526,26 @@
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
                 android:text="@string/connection_logs"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:layout_marginBottom="8dp"
+                android:text="@string/updates_section"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/update_app"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:backgroundTint="@color/surface"
+                android:text="@string/update_app"
+                android:textAllCaps="false"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp" />
         </LinearLayout>

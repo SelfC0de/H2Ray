@@ -69,4 +69,11 @@
     <string name="direct_ip">Исходный IP</string>
     <string name="proxy_ip">VPN IP</string>
     <string name="reconnect_settings">Изменения применятся после переподключения</string>
+    <string name="update_available">Доступно обязательное обновление</string>
+    <string name="update_app">Обновить приложение</string>
+    <string name="updates_section">ОБНОВЛЕНИЯ</string>
+    <string name="checking_update">Проверка обновления…</string>
+    <string name="no_update">Установлена актуальная версия</string>
+    <string name="update_check_failed">Не удалось проверить обновление</string>
+    <string name="update_open_failed">Не удалось открыть страницу загрузки</string>
 </resources>

@@ -8,6 +8,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.net.VpnService;
 import android.net.TrafficStats;
 import android.os.Build;
@@ -20,6 +21,8 @@ import android.text.InputType;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.style.RelativeSizeSpan;
+import android.text.style.URLSpan;
+import android.text.method.LinkMovementMethod;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
@@ -33,6 +36,7 @@ import com.h2ray.app.data.ProfileStore;
 import com.h2ray.app.data.ConnectionStatusStore;
 import com.h2ray.app.data.AppSettings;
 import com.h2ray.app.network.PublicIpResolver;
+import com.h2ray.app.network.UpdateChecker;
 import com.h2ray.app.vpn.H2RayVpnService;
 import com.h2ray.app.xray.XrayBridge;
 
@@ -71,7 +75,10 @@ public final class MainActivity extends Activity {
     private TextView statUpload;
     private TextView statIp;
     private TextView statIpLabel;
+    private TextView updateBadge;
     private final AtomicBoolean ipLookupRunning = new AtomicBoolean(false);
+    private final AtomicBoolean updateCheckRunning = new AtomicBoolean(false);
+    private volatile UpdateChecker.Result latestUpdate;
     private volatile long lastIpAttempt;
 
     private final Runnable stateUpdater = new Runnable() {
@@ -84,6 +91,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        setTheme(R.style.Theme_H2Ray);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -108,6 +116,7 @@ public final class MainActivity extends Activity {
         statUpload = findViewById(R.id.stat_upload);
         statIp = findViewById(R.id.stat_ip);
         statIpLabel = findViewById(R.id.stat_ip_label);
+        updateBadge = findViewById(R.id.update_badge);
 
         connectButton.setOnClickListener(view -> toggleConnection());
         importButton.setOnClickListener(view -> showImportDialog());
@@ -123,12 +132,15 @@ public final class MainActivity extends Activity {
         findViewById(R.id.open_logs).setOnClickListener(
             view -> startActivity(new Intent(this, LogsActivity.class))
         );
+        updateBadge.setOnClickListener(view -> openAvailableUpdate());
+        findViewById(R.id.update_app).setOnClickListener(view -> checkForUpdates(true));
         configureSettings();
         configureRules();
         configureNavigationLabels();
         applySystemBarInsets();
         requestNotificationPermissionIfNeeded();
         render();
+        checkForUpdates(false);
     }
 
     @Override
@@ -292,14 +304,92 @@ public final class MainActivity extends Activity {
                 } else if (which == 2) {
                     startActivity(new Intent(this, LogsActivity.class));
                 } else {
-                    new AlertDialog.Builder(this)
-                        .setTitle(R.string.app_name)
-                        .setMessage(R.string.app_information)
-                        .setPositiveButton(android.R.string.ok, null)
-                        .show();
+                    showAboutDialog();
                 }
             })
             .show();
+    }
+
+    private void showAboutDialog() {
+        SpannableString content = new SpannableString(getString(R.string.app_information));
+        addLink(content, "Dev by SelfCode", "https://github.com/SelfC0de");
+        addLink(content, "vk.com/selfcode_dev", "https://vk.com/selfcode_dev");
+        addLink(content, "t.me/selfcode_dev", "https://t.me/selfcode_dev");
+        addLink(content, "Github:github.com/SelfC0de", "https://github.com/SelfC0de");
+
+        TextView message = new TextView(this);
+        message.setText(content);
+        message.setMovementMethod(LinkMovementMethod.getInstance());
+        message.setLinkTextColor(getColor(R.color.accent));
+        message.setTextColor(getColor(R.color.text_primary));
+        message.setTextSize(15);
+        message.setLineSpacing(0, 1.25f);
+        message.setPadding(dp(24), dp(12), dp(24), dp(4));
+
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.app_name)
+            .setView(message)
+            .setPositiveButton(android.R.string.ok, null)
+            .show();
+    }
+
+    private void addLink(SpannableString content, String label, String url) {
+        int start = content.toString().indexOf(label);
+        if (start >= 0) {
+            content.setSpan(
+                new URLSpan(url),
+                start,
+                start + label.length(),
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            );
+        }
+    }
+
+    private void checkForUpdates(boolean userInitiated) {
+        UpdateChecker.Result cached = latestUpdate;
+        if (userInitiated && cached != null && cached.updateAvailable) {
+            openAvailableUpdate();
+            return;
+        }
+        if (!updateCheckRunning.compareAndSet(false, true)) {
+            return;
+        }
+        if (userInitiated) {
+            Toast.makeText(this, R.string.checking_update, Toast.LENGTH_SHORT).show();
+        }
+        executor.execute(() -> {
+            UpdateChecker.Result result = UpdateChecker.check(this);
+            latestUpdate = result;
+            updateCheckRunning.set(false);
+            runOnUiThread(() -> {
+                updateBadge.setVisibility(result.updateAvailable ? View.VISIBLE : View.GONE);
+                if (!userInitiated) {
+                    return;
+                }
+                if (result.updateAvailable) {
+                    openAvailableUpdate();
+                } else {
+                    Toast.makeText(
+                        this,
+                        result.failed ? R.string.update_check_failed : R.string.no_update,
+                        Toast.LENGTH_SHORT
+                    ).show();
+                }
+            });
+        });
+    }
+
+    private void openAvailableUpdate() {
+        UpdateChecker.Result update = latestUpdate;
+        if (update == null || !update.updateAvailable || update.apkUrl.isEmpty()) {
+            checkForUpdates(true);
+            return;
+        }
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(update.apkUrl)));
+        } catch (Exception error) {
+            Toast.makeText(this, R.string.update_open_failed, Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void reconnect() {
