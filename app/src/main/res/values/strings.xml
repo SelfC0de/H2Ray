@@ -30,7 +30,10 @@
     <string name="home_opened">Вы уже на главном экране</string>
     <string name="rules_next_stage">Редактор правил будет добавлен на следующем этапе</string>
     <string name="settings_next_stage">Настройки будут добавлены на следующем этапе</string>
-    <string name="app_information">H2Ray Client\nDev by SelfCode\nvk.com/selfcode_dev\nt.me/selfcode_dev\nGithub:github.com/SelfC0de</string>
+    <string name="about_developer">Dev by SelfCode</string>
+    <string name="about_vk">VK · selfcode_dev</string>
+    <string name="about_telegram">Telegram · selfcode_dev</string>
+    <string name="about_github">GitHub · SelfC0de</string>
     <string name="connection_error_details">Ошибка Xray-core</string>
     <string name="connection_logs">Журнал подключения</string>
     <string name="copy_logs">Копировать</string>

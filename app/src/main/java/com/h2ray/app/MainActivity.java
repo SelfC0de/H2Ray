@@ -1,6 +1,9 @@
 package com.h2ray.app;
 
 import android.Manifest;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DownloadManager;
@@ -12,9 +15,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
-import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.net.Uri;
@@ -34,10 +37,9 @@ import android.text.TextWatcher;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.style.RelativeSizeSpan;
-import android.text.style.URLSpan;
-import android.text.method.LinkMovementMethod;
 import android.view.View;
 import android.view.WindowInsets;
+import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -130,6 +132,7 @@ public final class MainActivity extends Activity {
     private boolean appUnlocked;
     private boolean unlockRequested;
     private long lastPausedAt;
+    private AnimatorSet homeAnimator;
     private String profileSearch = "";
     private boolean profileSorting;
     private String pendingProfileExport;
@@ -273,6 +276,7 @@ public final class MainActivity extends Activity {
         }
         checkForUpdates(false);
         updateSubscriptions(false);
+        startHomeAnimations();
     }
 
     @Override
@@ -283,6 +287,9 @@ public final class MainActivity extends Activity {
         }
         requestAppUnlockIfNeeded();
         handler.post(stateUpdater);
+        if (homeScreen.getVisibility() == View.VISIBLE) {
+            startHomeAnimations();
+        }
         if (waitingForInstallPermission
             && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
             && getPackageManager().canRequestPackageInstalls()) {
@@ -298,6 +305,7 @@ public final class MainActivity extends Activity {
     protected void onPause() {
         handler.removeCallbacks(stateUpdater);
         lastPausedAt = SystemClock.elapsedRealtime();
+        stopHomeAnimations();
         super.onPause();
     }
 
@@ -679,38 +687,76 @@ public final class MainActivity extends Activity {
     }
 
     private void showAboutDialog() {
-        SpannableString content = new SpannableString(getString(R.string.app_information));
-        addLink(content, "Dev by SelfCode", "https://github.com/SelfC0de");
-        addLink(content, "vk.com/selfcode_dev", "https://vk.com/selfcode_dev");
-        addLink(content, "t.me/selfcode_dev", "https://t.me/selfcode_dev");
-        addLink(content, "Github:github.com/SelfC0de", "https://github.com/SelfC0de");
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        panel.setPadding(dp(22), dp(24), dp(22), dp(14));
+        panel.setBackgroundResource(R.drawable.bg_card);
 
-        TextView message = new TextView(this);
-        message.setText(content);
-        message.setMovementMethod(LinkMovementMethod.getInstance());
-        message.setLinkTextColor(getColor(R.color.accent));
-        message.setTextColor(getColor(R.color.text_primary));
-        message.setTextSize(15);
-        message.setLineSpacing(0, 1.25f);
-        message.setPadding(dp(24), dp(12), dp(24), dp(4));
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.h2ray_logo);
+        panel.addView(logo, new LinearLayout.LayoutParams(dp(76), dp(76)));
+
+        TextView title = new TextView(this);
+        title.setText("H2Ray Client · v" + currentVersion());
+        title.setTextColor(getColor(R.color.text_primary));
+        title.setTextSize(20);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setGravity(android.view.Gravity.CENTER);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        titleParams.topMargin = dp(10);
+        titleParams.bottomMargin = dp(14);
+        panel.addView(title, titleParams);
+
+        panel.addView(aboutLink(
+            R.string.about_developer,
+            "https://github.com/SelfC0de"
+        ));
+        panel.addView(aboutLink(
+            R.string.about_vk,
+            "https://vk.com/selfcode_dev"
+        ));
+        panel.addView(aboutLink(
+            R.string.about_telegram,
+            "https://t.me/selfcode_dev"
+        ));
+        panel.addView(aboutLink(
+            R.string.about_github,
+            "https://github.com/SelfC0de"
+        ));
 
         new AlertDialog.Builder(this)
-            .setTitle(R.string.app_name)
-            .setView(message)
+            .setView(panel)
             .setPositiveButton(android.R.string.ok, null)
             .show();
     }
 
-    private void addLink(SpannableString content, String label, String url) {
-        int start = content.toString().indexOf(label);
-        if (start >= 0) {
-            content.setSpan(
-                new URLSpan(url),
-                start,
-                start + label.length(),
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-            );
-        }
+    private TextView aboutLink(int label, String url) {
+        TextView link = new TextView(this);
+        link.setText(label);
+        link.setTextColor(getColor(R.color.accent));
+        link.setTextSize(14);
+        link.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        link.setPadding(dp(16), 0, dp(16), 0);
+        link.setBackgroundResource(R.drawable.bg_stat);
+        link.setCompoundDrawablesWithIntrinsicBounds(0, 0, android.R.drawable.ic_menu_view, 0);
+        link.setOnClickListener(view -> {
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            } catch (RuntimeException error) {
+                Toast.makeText(this, R.string.update_open_failed, Toast.LENGTH_SHORT).show();
+            }
+        });
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(48)
+        );
+        params.bottomMargin = dp(8);
+        link.setLayoutParams(params);
+        return link;
     }
 
     private void checkForUpdates(boolean userInitiated) {
@@ -977,6 +1023,11 @@ public final class MainActivity extends Activity {
         setNavColor(R.id.nav_profiles, "profiles".equals(target));
         setNavColor(R.id.nav_rules, "rules".equals(target));
         setNavColor(R.id.nav_settings, "settings".equals(target));
+        if ("home".equals(target)) {
+            startHomeAnimations();
+        } else {
+            stopHomeAnimations();
+        }
         if ("profiles".equals(target)) {
             renderProfiles();
         }
@@ -986,6 +1037,66 @@ public final class MainActivity extends Activity {
         if ("rules".equals(target)) {
             renderRules();
         }
+    }
+
+    private void startHomeAnimations() {
+        if (homeAnimator != null && homeAnimator.isRunning()) {
+            return;
+        }
+        homeScreen.setAlpha(0f);
+        homeScreen.setTranslationY(dp(8));
+        homeScreen.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(320)
+            .setInterpolator(new AccelerateDecelerateInterpolator())
+            .start();
+
+        View logo = findViewById(R.id.home_logo);
+        ObjectAnimator pulseX = ObjectAnimator.ofFloat(
+            connectButton,
+            View.SCALE_X,
+            1f,
+            1.025f
+        );
+        ObjectAnimator pulseY = ObjectAnimator.ofFloat(
+            connectButton,
+            View.SCALE_Y,
+            1f,
+            1.025f
+        );
+        ObjectAnimator logoGlow = ObjectAnimator.ofFloat(logo, View.ALPHA, 0.72f, 1f);
+        for (ObjectAnimator animator : new ObjectAnimator[] {pulseX, pulseY, logoGlow}) {
+            animator.setDuration(1800);
+            animator.setRepeatMode(ValueAnimator.REVERSE);
+            animator.setRepeatCount(ValueAnimator.INFINITE);
+            animator.setInterpolator(new AccelerateDecelerateInterpolator());
+        }
+        homeAnimator = new AnimatorSet();
+        homeAnimator.playTogether(pulseX, pulseY, logoGlow);
+        homeAnimator.start();
+
+        View profile = findViewById(R.id.profile_card);
+        profile.setAlpha(0f);
+        profile.setTranslationY(dp(10));
+        profile.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setStartDelay(100)
+            .setDuration(360)
+            .start();
+    }
+
+    private void stopHomeAnimations() {
+        homeScreen.animate().cancel();
+        findViewById(R.id.profile_card).animate().cancel();
+        if (homeAnimator != null) {
+            homeAnimator.cancel();
+            homeAnimator = null;
+        }
+        connectButton.setScaleX(1f);
+        connectButton.setScaleY(1f);
+        findViewById(R.id.home_logo).setAlpha(1f);
     }
 
     private void setNavColor(int id, boolean active) {
@@ -1676,29 +1787,29 @@ public final class MainActivity extends Activity {
     }
 
     private void chooseBypassApps() {
-        Intent launcher = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-        List<ResolveInfo> resolved = getPackageManager().queryIntentActivities(launcher, 0);
-        resolved.sort(Comparator.comparing(item ->
-            item.loadLabel(getPackageManager()).toString().toLowerCase(Locale.ROOT)));
-        List<ResolveInfo> apps = new ArrayList<>();
-        for (ResolveInfo item : resolved) {
-            if (item.activityInfo != null
-                && !getPackageName().equals(item.activityInfo.packageName)) {
+        List<ApplicationInfo> installed =
+            getPackageManager().getInstalledApplications(PackageManager.GET_META_DATA);
+        List<ApplicationInfo> apps = new ArrayList<>();
+        for (ApplicationInfo item : installed) {
+            if (!getPackageName().equals(item.packageName)) {
                 apps.add(item);
             }
         }
+        apps.sort(Comparator.comparing(item ->
+            item.loadLabel(getPackageManager()).toString().toLowerCase(Locale.ROOT)));
         String[] labels = new String[apps.size()];
         boolean[] checked = new boolean[apps.size()];
         Set<String> selected = new LinkedHashSet<>(appSettings.bypassApps());
         for (int index = 0; index < apps.size(); index++) {
-            ResolveInfo item = apps.get(index);
-            labels[index] = item.loadLabel(getPackageManager()).toString();
-            checked[index] = selected.contains(item.activityInfo.packageName);
+            ApplicationInfo item = apps.get(index);
+            String appLabel = item.loadLabel(getPackageManager()).toString();
+            labels[index] = appLabel + "\n" + item.packageName;
+            checked[index] = selected.contains(item.packageName);
         }
         new AlertDialog.Builder(this)
             .setTitle(R.string.bypass_apps)
             .setMultiChoiceItems(labels, checked, (dialog, which, enabled) -> {
-                String packageName = apps.get(which).activityInfo.packageName;
+                String packageName = apps.get(which).packageName;
                 if (enabled) {
                     selected.add(packageName);
                 } else {

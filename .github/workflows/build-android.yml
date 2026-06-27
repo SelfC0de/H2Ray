@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version_name:
-        description: Public version (for example 1.0.0.7)
+        description: Public version (for example 1.0.0.8)
         required: true
-        default: "1.0.0.7"
+        default: "1.0.0.8"
         type: string
 
 permissions:
