@@ -1017,6 +1017,20 @@ public final class MainActivity extends Activity {
     }
 
     private void showScreen(String target) {
+        if (!"profiles".equals(target)) {
+            if (profilesExpanded) {
+                toggleProfilesSection();
+            }
+            if (profileAutomationExpanded) {
+                toggleProfileAutomation();
+            }
+        }
+        if (!"rules".equals(target) && routingExpanded) {
+            findViewById(R.id.routing_header).performClick();
+        }
+        if (!"settings".equals(target)) {
+            closeOtherSettingsPanels("");
+        }
         homeScreen.setVisibility("home".equals(target) ? View.VISIBLE : View.GONE);
         profilesScreen.setVisibility("profiles".equals(target) ? View.VISIBLE : View.GONE);
         rulesScreen.setVisibility("rules".equals(target) ? View.VISIBLE : View.GONE);
@@ -1431,6 +1445,9 @@ public final class MainActivity extends Activity {
     }
 
     private void toggleProfilesSection() {
+        if (!profilesExpanded && profileAutomationExpanded) {
+            toggleProfileAutomation();
+        }
         profilesExpanded = !profilesExpanded;
         setTileActive(R.id.profile_servers_tile, profilesExpanded);
         findViewById(R.id.profiles_list_scroll).setVisibility(
@@ -1446,6 +1463,9 @@ public final class MainActivity extends Activity {
     }
 
     private void toggleProfileAutomation() {
+        if (!profileAutomationExpanded && profilesExpanded) {
+            toggleProfilesSection();
+        }
         profileAutomationExpanded = !profileAutomationExpanded;
         setTileActive(R.id.profile_tools_tile, profileAutomationExpanded);
         findViewById(R.id.profile_automation_panel).setVisibility(
@@ -1599,6 +1619,9 @@ public final class MainActivity extends Activity {
     }
 
     private void toggleConnectionSettings() {
+        if (!connectionSettingsExpanded) {
+            closeOtherSettingsPanels("connection");
+        }
         connectionSettingsExpanded = !connectionSettingsExpanded;
         setTileActive(R.id.connection_tile, connectionSettingsExpanded);
         setViewsVisible(connectionSettingsExpanded,
@@ -1616,6 +1639,9 @@ public final class MainActivity extends Activity {
     }
 
     private void toggleDiagnostics() {
+        if (!diagnosticsExpanded) {
+            closeOtherSettingsPanels("diagnostics");
+        }
         diagnosticsExpanded = !diagnosticsExpanded;
         setTileActive(R.id.diagnostics_tile, diagnosticsExpanded);
         setViewsVisible(
@@ -1631,6 +1657,9 @@ public final class MainActivity extends Activity {
     }
 
     private void toggleUpdates() {
+        if (!updatesExpanded) {
+            closeOtherSettingsPanels("updates");
+        }
         updatesExpanded = !updatesExpanded;
         setTileActive(R.id.updates_tile, updatesExpanded);
         setViewsVisible(updatesExpanded, R.id.update_app);
@@ -1640,6 +1669,9 @@ public final class MainActivity extends Activity {
     }
 
     private void toggleSecurity() {
+        if (!securityExpanded) {
+            closeOtherSettingsPanels("security");
+        }
         securityExpanded = !securityExpanded;
         setTileActive(R.id.security_tile, securityExpanded);
         setViewsVisible(securityExpanded, R.id.setting_app_lock);
@@ -1667,6 +1699,21 @@ public final class MainActivity extends Activity {
         }
         unlockRequested = true;
         startActivityForResult(unlock, APP_UNLOCK_REQUEST);
+    }
+
+    private void closeOtherSettingsPanels(String keep) {
+        if (!"connection".equals(keep) && connectionSettingsExpanded) {
+            toggleConnectionSettings();
+        }
+        if (!"diagnostics".equals(keep) && diagnosticsExpanded) {
+            toggleDiagnostics();
+        }
+        if (!"updates".equals(keep) && updatesExpanded) {
+            toggleUpdates();
+        }
+        if (!"security".equals(keep) && securityExpanded) {
+            toggleSecurity();
+        }
     }
 
     private void chooseDns() {

@@ -48,7 +48,9 @@ public final class AppRoutingDialog {
             List<ApplicationInfo> apps = new ArrayList<>();
             for (ApplicationInfo app :
                 manager.getInstalledApplications(PackageManager.GET_META_DATA)) {
-                if (!activity.getPackageName().equals(app.packageName)) {
+                boolean system = (app.flags & ApplicationInfo.FLAG_SYSTEM) != 0
+                    || (app.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0;
+                if (!system && !activity.getPackageName().equals(app.packageName)) {
                     apps.add(app);
                 }
             }
@@ -80,12 +82,28 @@ public final class AppRoutingDialog {
         handle.setTextSize(22);
         root.addView(handle, match(dp(activity, 28)));
 
+        LinearLayout titleRow = new LinearLayout(activity);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView title = new TextView(activity);
         title.setText(R.string.apps_panel_title);
         title.setTextColor(activity.getColor(R.color.text_primary));
         title.setTextSize(23);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
-        root.addView(title, match(dp(activity, 48)));
+        titleRow.addView(title, new LinearLayout.LayoutParams(
+            0,
+            dp(activity, 48),
+            1f
+        ));
+        TextView close = new TextView(activity);
+        close.setText("×");
+        close.setGravity(Gravity.CENTER);
+        close.setTextColor(activity.getColor(R.color.text_secondary));
+        close.setTextSize(30);
+        titleRow.addView(close, new LinearLayout.LayoutParams(
+            dp(activity, 48),
+            dp(activity, 48)
+        ));
+        root.addView(titleRow, match(dp(activity, 48)));
 
         EditText search = new EditText(activity);
         search.setHint(R.string.search_apps);
@@ -165,8 +183,11 @@ public final class AppRoutingDialog {
             Toast.makeText(activity, R.string.apps_saved, Toast.LENGTH_SHORT).show();
             dialog.dismiss();
         });
+        close.setOnClickListener(view -> dialog.dismiss());
 
         dialog.setContentView(root);
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
         Window window = dialog.getWindow();
         if (window != null) {
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));

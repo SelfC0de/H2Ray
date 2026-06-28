@@ -14,19 +14,18 @@
 
         <ImageView
             android:id="@+id/splash_logo"
-            android:layout_width="168dp"
-            android:layout_height="168dp"
-            android:adjustViewBounds="true"
+            android:layout_width="196dp"
+            android:layout_height="196dp"
+            android:adjustViewBounds="false"
             android:contentDescription="@null"
-            android:padding="18dp"
-            android:scaleType="fitCenter"
+            android:scaleType="centerInside"
             android:src="@drawable/h2ray_logo" />
 
         <TextView
             android:id="@+id/splash_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="22dp"
+            android:layout_marginTop="14dp"
             android:letterSpacing="0.04"
             android:text="@string/private_connect"
             android:textColor="@color/text_primary"
