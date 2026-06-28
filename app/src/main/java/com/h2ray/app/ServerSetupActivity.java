@@ -12,6 +12,7 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -96,8 +97,8 @@ public final class ServerSetupActivity extends Activity {
         findViewById(R.id.generate_panel_password).setOnClickListener(
             view -> panelPasswordInput.setText(randomToken(20))
         );
-        Button sshPasswordToggle = findViewById(R.id.toggle_ssh_password);
-        Button panelPasswordToggle = findViewById(R.id.toggle_panel_password);
+        ImageButton sshPasswordToggle = findViewById(R.id.toggle_ssh_password);
+        ImageButton panelPasswordToggle = findViewById(R.id.toggle_panel_password);
         sshPasswordToggle.setOnClickListener(
             view -> togglePassword(sshPasswordInput, sshPasswordToggle)
         );
@@ -488,13 +489,18 @@ public final class ServerSetupActivity extends Activity {
         return result.toString();
     }
 
-    private void togglePassword(EditText input, Button button) {
+    private void togglePassword(EditText input, ImageButton button) {
         boolean hidden = input.getTransformationMethod() instanceof
             PasswordTransformationMethod;
         input.setTransformationMethod(
             hidden ? null : PasswordTransformationMethod.getInstance()
         );
-        button.setText(hidden ? R.string.hide_password : R.string.show_password);
+        button.setImageResource(
+            hidden ? R.drawable.ic_visibility_off : R.drawable.ic_visibility
+        );
+        button.setContentDescription(getString(
+            hidden ? R.string.hide_password : R.string.show_password
+        ));
         input.setSelection(input.length());
     }
 
