@@ -1,6 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">H2Ray</string>
+    <string name="back">Назад</string>
+    <string name="three_xui_server">Свой сервер · 3x-ui</string>
+    <string name="ssh_connection">Подключение по SSH</string>
+    <string name="ssh_host">IP или домен сервера</string>
+    <string name="ssh_port">Порт</string>
+    <string name="ssh_username">SSH username</string>
+    <string name="ssh_password">SSH password / sudo password</string>
+    <string name="test_ssh">Проверить SSH</string>
+    <string name="panel_credentials">Данные администратора 3x-ui</string>
+    <string name="panel_username">Username панели</string>
+    <string name="panel_password">Password панели</string>
+    <string name="install_three_xui">Установить 3x-ui автоматически</string>
+    <string name="read_panel_data">Получить Access URL и состояние</string>
+    <string name="reset_panel_credentials">Установить username и password</string>
+    <string name="panel_ready">Панель доступна</string>
+    <string name="open_panel_browser">Открыть в браузере</string>
+    <string name="server_setup_idle">Введите SSH-данные и проверьте подключение. Пароль SSH не сохраняется.</string>
+    <string name="ssh_host_key_title">Проверка SSH host key</string>
+    <string name="ssh_host_key_message">Сверьте отпечаток сервера:\n\n%1$s\n\nТип ключа: %2$s\n\nДоверять этому серверу?</string>
+    <string name="ssh_verified">SSH подключение проверено</string>
+    <string name="ssh_error">Ошибка SSH: %1$s</string>
+    <string name="panel_installing">Установка 3x-ui. Не закрывайте приложение…</string>
+    <string name="panel_reading">Получение настроек 3x-ui…</string>
+    <string name="panel_resetting">Обновление учётных данных…</string>
+    <string name="panel_login_format">Username: %1$s\nPassword: %2$s</string>
     <string name="private_connect">Private Connect</string>
     <string name="connection_state">Состояние подключения</string>
     <string name="disconnected">Не подключено</string>

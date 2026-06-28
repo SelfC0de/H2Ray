@@ -205,6 +205,9 @@ public final class MainActivity extends Activity {
         connectionError.setOnClickListener(view -> showConnectionError());
         findViewById(R.id.profile_card).setOnClickListener(view -> showProfileActions());
         findViewById(R.id.header_menu_button).setOnClickListener(view -> showAppMenu());
+        findViewById(R.id.three_xui_button).setOnClickListener(
+            view -> startActivity(new Intent(this, ServerSetupActivity.class))
+        );
         findViewById(R.id.app_routing_button).setOnClickListener(
             view -> AppRoutingDialog.show(this)
         );

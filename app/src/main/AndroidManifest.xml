@@ -36,6 +36,10 @@
             android:name=".LogsActivity"
             android:exported="false" />
         <activity
+            android:name=".ServerSetupActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".QrCaptureActivity"
             android:exported="false"
             android:screenOrientation="portrait" />

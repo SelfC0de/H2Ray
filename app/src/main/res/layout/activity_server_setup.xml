@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="18dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="28dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/server_setup_back"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:contentDescription="@string/back"
+                android:focusable="true"
+                android:padding="12dp"
+                android:src="@drawable/ic_back" />
+
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="@null"
+                android:src="@drawable/three_x_icon" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:text="@string/three_xui_server"
+                android:textColor="@color/text_primary"
+                android:textSize="21sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/ssh_connection"
+            android:textColor="@color/accent"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/ssh_host"
+            style="@style/H2RayServerInput"
+            android:hint="@string/ssh_host"
+            android:inputType="textUri" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/ssh_port"
+                style="@style/H2RayServerInput"
+                android:layout_width="0dp"
+                android:layout_weight="0.34"
+                android:hint="@string/ssh_port"
+                android:inputType="number"
+                android:text="22" />
+
+            <EditText
+                android:id="@+id/ssh_user"
+                style="@style/H2RayServerInput"
+                android:layout_width="0dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="0.66"
+                android:hint="@string/ssh_username"
+                android:inputType="text"
+                android:text="root" />
+        </LinearLayout>
+
+        <EditText
+            android:id="@+id/ssh_password"
+            style="@style/H2RayServerInput"
+            android:hint="@string/ssh_password"
+            android:inputType="textPassword" />
+
+        <Button
+            android:id="@+id/test_ssh"
+            style="@style/H2RayServerButton"
+            android:text="@string/test_ssh" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="@string/panel_credentials"
+            android:textColor="@color/accent"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/panel_username"
+            style="@style/H2RayServerInput"
+            android:hint="@string/panel_username"
+            android:inputType="text" />
+
+        <EditText
+            android:id="@+id/panel_password"
+            style="@style/H2RayServerInput"
+            android:hint="@string/panel_password"
+            android:inputType="textPassword" />
+
+        <Button
+            android:id="@+id/install_panel"
+            style="@style/H2RayServerButton"
+            android:text="@string/install_three_xui" />
+
+        <Button
+            android:id="@+id/read_panel"
+            style="@style/H2RayServerButtonSecondary"
+            android:text="@string/read_panel_data" />
+
+        <Button
+            android:id="@+id/reset_panel_credentials"
+            style="@style/H2RayServerButtonSecondary"
+            android:text="@string/reset_panel_credentials" />
+
+        <LinearLayout
+            android:id="@+id/panel_result"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/panel_ready"
+                android:textColor="@color/success"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/panel_url"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:textColor="@color/text_primary"
+                android:textIsSelectable="true"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/panel_login"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/text_secondary"
+                android:textIsSelectable="true"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/open_panel"
+                style="@style/H2RayServerButton"
+                android:text="@string/open_panel_browser" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/server_setup_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_stat"
+            android:minHeight="64dp"
+            android:padding="14dp"
+            android:text="@string/server_setup_idle"
+            android:textColor="@color/text_secondary"
+            android:textIsSelectable="true"
+            android:textSize="12sp" />
+    </LinearLayout>
+</ScrollView>

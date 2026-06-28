@@ -13,7 +13,7 @@ android {
         minSdk = 28
         targetSdk = 36
         versionCode = System.getenv("H2RAY_VERSION_CODE")?.toIntOrNull() ?: 1
-        versionName = System.getenv("H2RAY_VERSION_NAME") ?: "1.0.0.15"
+        versionName = System.getenv("H2RAY_VERSION_NAME") ?: "1.0.0.16"
     }
 
     signingConfigs {
@@ -50,4 +50,6 @@ dependencies {
     implementation(files("libs/libXray.aar"))
     implementation("androidx.core:core:1.17.0")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("com.github.mwiede:jsch:2.28.3")
+    implementation("net.i2p.crypto:eddsa:0.3.0")
 }
