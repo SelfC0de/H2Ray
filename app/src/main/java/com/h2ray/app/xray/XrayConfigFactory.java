@@ -273,9 +273,19 @@ public final class XrayConfigFactory {
         client.put("password", password);
         client.put("shortId", stringValue(source, "shortId"));
         client.remove("publicKey");
+        client.remove("target");
+        client.remove("dest");
+        client.remove("type");
+        client.remove("xver");
         client.remove("serverNames");
         client.remove("privateKey");
+        client.remove("minClientVer");
+        client.remove("maxClientVer");
+        client.remove("maxTimeDiff");
         client.remove("shortIds");
+        client.remove("mldsa65Seed");
+        client.remove("limitFallbackUpload");
+        client.remove("limitFallbackDownload");
         stream.put("realitySettings", client);
     }
 
