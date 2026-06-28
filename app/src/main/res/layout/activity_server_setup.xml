@@ -107,15 +107,27 @@
             android:hint="@string/ssh_password"
             android:inputType="textPassword" />
 
-        <Button
-            android:id="@+id/toggle_ssh_password"
-            style="@style/H2RayInlineButton"
-            android:text="@string/show_password" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <Button
-            android:id="@+id/test_ssh"
-            style="@style/H2RayServerButton"
-            android:text="@string/test_ssh" />
+            <Button
+                android:id="@+id/toggle_ssh_password"
+                style="@style/H2RayInlineButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="@string/show_password" />
+
+            <Button
+                android:id="@+id/test_ssh"
+                style="@style/H2RayServerButton"
+                android:layout_width="0dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="@string/test_ssh" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"

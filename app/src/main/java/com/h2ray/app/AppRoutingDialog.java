@@ -34,8 +34,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public final class AppRoutingDialog {
     private AppRoutingDialog() {
@@ -43,8 +41,19 @@ public final class AppRoutingDialog {
 
     public static void show(Activity activity) {
         Toast.makeText(activity, R.string.scanning_apps, Toast.LENGTH_SHORT).show();
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        executor.execute(() -> {
+        new AppScanner(activity).start();
+    }
+
+    private static final class AppScanner extends Thread {
+        private final Activity activity;
+
+        AppScanner(Activity activity) {
+            super("H2Ray-AppScanner");
+            this.activity = activity;
+        }
+
+        @Override
+        public void run() {
             try {
                 PackageManager manager = activity.getPackageManager();
                 List<ApplicationInfo> apps = new ArrayList<>();
@@ -59,27 +68,64 @@ public final class AppRoutingDialog {
                         apps.add(app);
                     }
                 }
-                apps.sort(Comparator.comparing(
-                    app -> safeLabel(manager, app).toLowerCase(Locale.ROOT)
-                ));
-                new Handler(Looper.getMainLooper()).post(() -> {
-                    try {
-                        if (!activity.isFinishing() && !activity.isDestroyed()) {
-                            build(activity, apps);
-                        }
-                    } catch (RuntimeException error) {
-                        showScanError(activity, error);
-                    } finally {
-                        executor.shutdown();
-                    }
-                });
+                apps.sort(new AppLabelComparator(manager));
+                new Handler(Looper.getMainLooper()).post(
+                    new ScanResult(activity, apps, null)
+                );
             } catch (RuntimeException error) {
-                new Handler(Looper.getMainLooper()).post(() -> {
-                    showScanError(activity, error);
-                    executor.shutdown();
-                });
+                new Handler(Looper.getMainLooper()).post(
+                    new ScanResult(activity, null, error)
+                );
             }
-        });
+        }
+    }
+
+    private static final class AppLabelComparator
+        implements Comparator<ApplicationInfo> {
+        private final PackageManager manager;
+
+        AppLabelComparator(PackageManager manager) {
+            this.manager = manager;
+        }
+
+        @Override
+        public int compare(ApplicationInfo left, ApplicationInfo right) {
+            return safeLabel(manager, left).compareToIgnoreCase(
+                safeLabel(manager, right)
+            );
+        }
+    }
+
+    private static final class ScanResult implements Runnable {
+        private final Activity activity;
+        private final List<ApplicationInfo> apps;
+        private final RuntimeException error;
+
+        ScanResult(
+            Activity activity,
+            List<ApplicationInfo> apps,
+            RuntimeException error
+        ) {
+            this.activity = activity;
+            this.apps = apps;
+            this.error = error;
+        }
+
+        @Override
+        public void run() {
+            if (activity.isFinishing() || activity.isDestroyed()) {
+                return;
+            }
+            if (error != null) {
+                showScanError(activity, error);
+                return;
+            }
+            try {
+                build(activity, apps);
+            } catch (RuntimeException buildError) {
+                showScanError(activity, buildError);
+            }
+        }
     }
 
     private static void build(Activity activity, List<ApplicationInfo> apps) {
