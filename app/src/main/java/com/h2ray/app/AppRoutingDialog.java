@@ -122,7 +122,7 @@ public final class AppRoutingDialog {
 
         Button apply = new Button(activity);
         apply.setText(R.string.apply);
-        apply.setTextAllCaps(false);
+        apply.setAllCaps(false);
         apply.setTextSize(16);
         apply.setTextColor(Color.BLACK);
         apply.setBackgroundTintList(
@@ -185,7 +185,7 @@ public final class AppRoutingDialog {
     private static Button modeButton(Context context, int text) {
         Button button = new Button(context);
         button.setText(text);
-        button.setTextAllCaps(false);
+        button.setAllCaps(false);
         button.setTextColor(context.getColor(R.color.text_primary));
         button.setTextSize(13);
         button.setBackgroundTintList(
