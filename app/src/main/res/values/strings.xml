@@ -146,6 +146,9 @@
     <string name="search_apps">Поиск приложений</string>
     <string name="apps_only_vpn">Через VPN</string>
     <string name="apps_outside_vpn">Вне VPN</string>
+    <string name="apps_only_vpn_hint">Отмеченные приложения будут работать через VPN</string>
+    <string name="apps_outside_vpn_hint">Отмеченные приложения будут обходить VPN</string>
+    <string name="apps_selected_count">Выбрано: %1$d</string>
     <string name="apply">Применить</string>
     <string name="apps_saved">Правила приложений сохранены</string>
     <string name="category_servers">Серверы\n%1$d профилей</string>

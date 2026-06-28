@@ -26,6 +26,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.h2ray.app.data.AppSettings;
+import com.h2ray.app.vpn.H2RayVpnService;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -124,11 +125,34 @@ public final class AppRoutingDialog {
         modes.addView(bypass, weighted(dp(activity, 48)));
         root.addView(modes, match(dp(activity, 48)));
 
+        LinearLayout modeInfo = new LinearLayout(activity);
+        modeInfo.setGravity(Gravity.CENTER_VERTICAL);
+        TextView modeHint = new TextView(activity);
+        modeHint.setTextColor(activity.getColor(R.color.text_secondary));
+        modeHint.setTextSize(12);
+        modeInfo.addView(modeHint, new LinearLayout.LayoutParams(
+            0,
+            dp(activity, 42),
+            1f
+        ));
+        TextView selectedCount = new TextView(activity);
+        selectedCount.setTextColor(activity.getColor(R.color.accent));
+        selectedCount.setTextSize(12);
+        selectedCount.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        modeInfo.addView(selectedCount, new LinearLayout.LayoutParams(
+            dp(activity, 86),
+            dp(activity, 42)
+        ));
+        root.addView(modeInfo, match(dp(activity, 42)));
+
         ListView list = new ListView(activity);
         list.setDivider(new ColorDrawable(activity.getColor(R.color.border)));
         list.setDividerHeight(1);
         list.setCacheColorHint(Color.TRANSPARENT);
-        AppAdapter adapter = new AppAdapter(activity, apps, selected);
+        Runnable renderCount = () -> selectedCount.setText(
+            activity.getString(R.string.apps_selected_count, selected.size())
+        );
+        AppAdapter adapter = new AppAdapter(activity, apps, selected, renderCount);
         list.setAdapter(adapter);
         LinearLayout.LayoutParams listParams = new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -151,8 +175,13 @@ public final class AppRoutingDialog {
         final String[] mode = {settings.appRoutingMode()};
         Runnable renderModes = () -> {
             boolean onlyMode = "only".equals(mode[0]);
-            only.setAlpha(onlyMode ? 1f : 0.55f);
-            bypass.setAlpha(onlyMode ? 0.55f : 1f);
+            renderModeButton(activity, only, onlyMode);
+            renderModeButton(activity, bypass, !onlyMode);
+            modeHint.setText(
+                onlyMode
+                    ? R.string.apps_only_vpn_hint
+                    : R.string.apps_outside_vpn_hint
+            );
         };
         only.setOnClickListener(view -> {
             mode[0] = "only";
@@ -163,6 +192,7 @@ public final class AppRoutingDialog {
             renderModes.run();
         });
         renderModes.run();
+        renderCount.run();
 
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(
@@ -178,8 +208,16 @@ public final class AppRoutingDialog {
             }
         });
         apply.setOnClickListener(view -> {
+            Set<String> installed = new LinkedHashSet<>();
+            for (ApplicationInfo app : apps) {
+                installed.add(app.packageName);
+            }
+            selected.retainAll(installed);
             settings.setBypassApps(selected);
             settings.setAppRoutingMode(mode[0]);
+            if (H2RayVpnService.isRunning()) {
+                activity.startService(H2RayVpnService.restartIntent(activity));
+            }
             Toast.makeText(activity, R.string.apps_saved, Toast.LENGTH_SHORT).show();
             dialog.dismiss();
         });
@@ -215,6 +253,14 @@ public final class AppRoutingDialog {
         return button;
     }
 
+    private static void renderModeButton(Context context, Button button, boolean active) {
+        button.setAlpha(1f);
+        button.setTextColor(context.getColor(active ? R.color.background : R.color.text_primary));
+        button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+            context.getColor(active ? R.color.accent : R.color.surface_elevated)
+        ));
+    }
+
     private static LinearLayout.LayoutParams match(int height) {
         return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height);
     }
@@ -235,11 +281,18 @@ public final class AppRoutingDialog {
         private final List<ApplicationInfo> all;
         private final List<ApplicationInfo> visible = new ArrayList<>();
         private final Set<String> selected;
+        private final Runnable selectionChanged;
 
-        AppAdapter(Activity activity, List<ApplicationInfo> apps, Set<String> selected) {
+        AppAdapter(
+            Activity activity,
+            List<ApplicationInfo> apps,
+            Set<String> selected,
+            Runnable selectionChanged
+        ) {
             this.activity = activity;
             this.all = apps;
             this.selected = selected;
+            this.selectionChanged = selectionChanged;
             visible.addAll(apps);
         }
 
@@ -290,6 +343,7 @@ public final class AppRoutingDialog {
                 } else {
                     selected.remove(app.packageName);
                 }
+                selectionChanged.run();
             });
             row.root.setOnClickListener(view -> row.check.setChecked(!row.check.isChecked()));
             return recycled;

@@ -46,6 +46,7 @@ import java.util.List;
 public final class H2RayVpnService extends VpnService {
     public static final String ACTION_START = "com.h2ray.app.action.START";
     public static final String ACTION_STOP = "com.h2ray.app.action.STOP";
+    public static final String ACTION_RESTART = "com.h2ray.app.action.RESTART";
     private static final String TAG = "H2RayVpnService";
     private static final String CHANNEL_ID = "h2ray_vpn";
     private static final int NOTIFICATION_ID = 1001;
@@ -79,6 +80,10 @@ public final class H2RayVpnService extends VpnService {
         return new Intent(context, H2RayVpnService.class).setAction(ACTION_STOP);
     }
 
+    public static Intent restartIntent(Context context) {
+        return new Intent(context, H2RayVpnService.class).setAction(ACTION_RESTART);
+    }
+
     public static boolean isRunning() {
         return CORE_STATE.get() == CoreState.RUNNING && XrayBridge.isRunning();
     }
@@ -105,6 +110,10 @@ public final class H2RayVpnService extends VpnService {
             requestStop(false);
             return START_NOT_STICKY;
         }
+        if (ACTION_RESTART.equals(action)) {
+            requestRestart();
+            return START_STICKY;
+        }
         new AppSettings(this).setDesiredVpnRunning(true);
 
         CoreState current = CORE_STATE.get();
@@ -123,6 +132,32 @@ public final class H2RayVpnService extends VpnService {
         startForeground(NOTIFICATION_ID, createNotification(getString(R.string.connecting)));
         executor.execute(this::startTunnel);
         return START_STICKY;
+    }
+
+    private void requestRestart() {
+        AppSettings settings = new AppSettings(this);
+        settings.setDesiredVpnRunning(true);
+        CoreState state = CORE_STATE.get();
+        if (state != CoreState.RUNNING) {
+            return;
+        }
+        if (!CORE_STATE.compareAndSet(CoreState.RUNNING, CoreState.STOPPING)) {
+            return;
+        }
+        cancelStart.set(true);
+        connectionStatus.setConnecting();
+        updateNotification(getString(R.string.connecting));
+        logStore.add("INFO", "Перезапуск VPN для применения правил приложений");
+        executor.execute(() -> {
+            synchronized (lifecycleLock) {
+                cleanupResources();
+                cancelStart.set(false);
+                startAttempt = 0;
+                preserveFailure = false;
+                CORE_STATE.set(CoreState.STARTING);
+                startTunnel();
+            }
+        });
     }
 
     private void startTunnel() {
@@ -322,12 +357,12 @@ public final class H2RayVpnService extends VpnService {
 
     private void configureApplicationRouting(Builder builder, AppSettings settings) {
         boolean onlySelected = "only".equals(settings.appRoutingMode());
-        if (onlySelected && settings.bypassApps().isEmpty()) {
+        if (onlySelected) {
             try {
                 builder.addAllowedApplication(getPackageName());
-            } catch (android.content.pm.PackageManager.NameNotFoundException ignored) {
+            } catch (android.content.pm.PackageManager.NameNotFoundException error) {
+                logStore.add("WARN", "Не удалось добавить H2Ray в VPN: " + error.getMessage());
             }
-            return;
         }
         for (String packageName : settings.bypassApps()) {
             try {
