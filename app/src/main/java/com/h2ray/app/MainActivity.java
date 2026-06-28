@@ -176,10 +176,11 @@ public final class MainActivity extends Activity {
 
         profileStore = new ProfileStore(this);
         connectionStatusStore = new ConnectionStatusStore(this);
+        appSettings = new AppSettings(this);
+        reconcileEmptyProfileState();
         if (!H2RayVpnService.isRunning()) {
             connectionStatusStore.setDirectIp("");
         }
-        appSettings = new AppSettings(this);
         subscriptionStore = new SubscriptionStore(this);
         updateDownloadManager = new UpdateDownloadManager(this);
         connectionStatus = findViewById(R.id.connection_status);
@@ -662,6 +663,7 @@ public final class MainActivity extends Activity {
                         startService(H2RayVpnService.stopIntent(this));
                     }
                     profileStore.clear();
+                    reconcileEmptyProfileState();
                     render();
                 }
             })
@@ -1216,6 +1218,7 @@ public final class MainActivity extends Activity {
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.delete_profile, (dialog, which) -> {
                 profileStore.delete(profile.id);
+                reconcileEmptyProfileState();
                 render();
                 renderProfiles();
             })
@@ -2143,6 +2146,9 @@ public final class MainActivity extends Activity {
     private void render() {
         boolean running = H2RayVpnService.isRunning();
         boolean hasProfile = profileStore.hasActiveProfile();
+        if (!hasProfile && !running) {
+            reconcileEmptyProfileState();
+        }
         String state = connectionStatusStore.getState();
         if (running || ConnectionStatusStore.RUNNING.equals(state)) {
             connectionStatus.setText(R.string.connected);
@@ -2161,6 +2167,22 @@ public final class MainActivity extends Activity {
         profileDetails.setText(hasProfile ? profileStore.getProtocol() : getString(R.string.import_required));
         importButton.setText(R.string.add_profile);
         renderStats(running);
+    }
+
+    private void reconcileEmptyProfileState() {
+        if (profileStore.hasActiveProfile()) {
+            return;
+        }
+        if (appSettings.desiredVpnRunning()) {
+            appSettings.setDesiredVpnRunning(false);
+        }
+        if (!ConnectionStatusStore.STOPPED.equals(connectionStatusStore.getState())
+            || !connectionStatusStore.getError().isEmpty()) {
+            connectionStatusStore.setStopped();
+        }
+        if (H2RayVpnService.isRunning() || H2RayVpnService.isBusy()) {
+            startService(H2RayVpnService.stopIntent(this));
+        }
     }
 
     private void requestNotificationPermissionIfNeeded() {

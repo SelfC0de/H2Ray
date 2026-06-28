@@ -114,7 +114,16 @@ public final class H2RayVpnService extends VpnService {
             requestRestart();
             return START_STICKY;
         }
-        new AppSettings(this).setDesiredVpnRunning(true);
+        AppSettings requestedSettings = new AppSettings(this);
+        if (!new ProfileStore(this).hasActiveProfile()) {
+            requestedSettings.setDesiredVpnRunning(false);
+            preserveFailure = false;
+            CORE_STATE.set(CoreState.STOPPED);
+            connectionStatus.setStopped();
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+        requestedSettings.setDesiredVpnRunning(true);
 
         CoreState current = CORE_STATE.get();
         if (current == CoreState.STARTING || current == CoreState.RUNNING) {
@@ -222,6 +231,18 @@ public final class H2RayVpnService extends VpnService {
         } catch (Throwable error) {
             Log.e(TAG, "Unable to start tunnel", error);
             AppSettings settings = new AppSettings(this);
+            if (!new ProfileStore(this).hasActiveProfile()) {
+                settings.setDesiredVpnRunning(false);
+                preserveFailure = false;
+                CORE_STATE.set(CoreState.STOPPED);
+                connectionStatus.setStopped();
+                synchronized (lifecycleLock) {
+                    cleanupResources();
+                }
+                stopForeground(STOP_FOREGROUND_REMOVE);
+                stopSelf();
+                return;
+            }
             if (!cancelStart.get() && settings.desiredVpnRunning()
                 && settings.autoReconnect() && startAttempt < settings.retryCount()) {
                 synchronized (lifecycleLock) {
