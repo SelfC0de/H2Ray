@@ -12,7 +12,7 @@
     </style>
 
     <style name="Theme.H2Ray.Launcher" parent="Theme.H2Ray">
-        <item name="android:windowBackground">@drawable/bg_splash</item>
+        <item name="android:windowBackground">@drawable/bg_welcome</item>
     </style>
 
     <style name="H2RayStatLabel">
@@ -78,5 +78,14 @@
         <item name="android:textColor">@color/text_primary</item>
         <item name="android:textSize">14sp</item>
         <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="H2RaySettingsTile" parent="H2RayCategoryTile">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_marginStart">5dp</item>
+        <item name="android:layout_marginTop">5dp</item>
+        <item name="android:layout_marginEnd">5dp</item>
+        <item name="android:layout_marginBottom">5dp</item>
     </style>
 </resources>

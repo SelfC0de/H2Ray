@@ -1901,8 +1901,7 @@ public final class MainActivity extends Activity {
     private void setTileActive(int id, boolean active) {
         TextView tile = findViewById(id);
         tile.setTextColor(getColor(active ? R.color.accent : R.color.text_primary));
-        tile.animate().scaleX(active ? 1.02f : 1f).scaleY(active ? 1.02f : 1f)
-            .setDuration(160).start();
+        tile.setAlpha(active ? 1f : 0.92f);
     }
 
     private void copyDiagnosticReport() {
