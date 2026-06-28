@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">H2Ray</string>
+    <string name="private_connect">Private Connect</string>
     <string name="connection_state">Состояние подключения</string>
     <string name="disconnected">Не подключено</string>
     <string name="connected">Защищено</string>
@@ -138,4 +139,18 @@
     <string name="custom_domains_hint">По одному правилу в строке: domain:example.com, 1.2.3.0/24, geoip:ru или geosite:category-ads-all</string>
     <string name="bypass_apps">Приложения вне VPN</string>
     <string name="scanning_apps">Сканирование установленных приложений…</string>
+    <string name="apps_panel_title">Приложения</string>
+    <string name="search_apps">Поиск приложений</string>
+    <string name="apps_only_vpn">Через VPN</string>
+    <string name="apps_outside_vpn">Вне VPN</string>
+    <string name="apply">Применить</string>
+    <string name="apps_saved">Правила приложений сохранены</string>
+    <string name="category_servers">Серверы\n%1$d профилей</string>
+    <string name="category_automation">Автоматизация\nБыстрый выбор</string>
+    <string name="category_routing">Маршрутизация\nДомены и DNS</string>
+    <string name="category_apps">Приложения\nВыбор трафика</string>
+    <string name="category_connection">Подключение\nDNS и надёжность</string>
+    <string name="category_diagnostics">Диагностика\nЛоги и отчёт</string>
+    <string name="category_updates">Обновления\nВерсия приложения</string>
+    <string name="category_security">Безопасность\nPIN и шифрование</string>
 </resources>

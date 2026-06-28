@@ -15,7 +15,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.database.Cursor;
@@ -77,8 +76,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
-import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -208,16 +205,19 @@ public final class MainActivity extends Activity {
         connectionError.setOnClickListener(view -> showConnectionError());
         findViewById(R.id.profile_card).setOnClickListener(view -> showProfileActions());
         findViewById(R.id.header_menu_button).setOnClickListener(view -> showAppMenu());
+        findViewById(R.id.app_routing_button).setOnClickListener(
+            view -> AppRoutingDialog.show(this)
+        );
         findViewById(R.id.nav_home).setOnClickListener(view -> showScreen("home"));
         findViewById(R.id.nav_profiles).setOnClickListener(view -> showScreen("profiles"));
         findViewById(R.id.nav_rules).setOnClickListener(view -> showScreen("rules"));
         findViewById(R.id.nav_settings).setOnClickListener(view -> showScreen("settings"));
         findViewById(R.id.add_profile).setOnClickListener(view -> showImportDialog());
         findViewById(R.id.ping_profiles).setOnClickListener(view -> pingProfiles(false));
-        findViewById(R.id.profiles_title).setOnClickListener(
+        findViewById(R.id.profile_servers_tile).setOnClickListener(
             view -> toggleProfilesSection()
         );
-        findViewById(R.id.profile_automation_header).setOnClickListener(
+        findViewById(R.id.profile_tools_tile).setOnClickListener(
             view -> toggleProfileAutomation()
         );
         findViewById(R.id.select_fastest_profile).setOnClickListener(
@@ -1141,11 +1141,8 @@ public final class MainActivity extends Activity {
                     .thenComparing(item -> item.name.toLowerCase(Locale.ROOT))
             );
         }
-        ((TextView) findViewById(R.id.profiles_title)).setText(
-            getString(
-                profilesExpanded ? R.string.profiles_expanded : R.string.profiles_collapsed,
-                allProfiles.size()
-            )
+        ((TextView) findViewById(R.id.profile_servers_tile)).setText(
+            getString(R.string.category_servers, allProfiles.size())
         );
         ProfileStore.Profile active = profileStore.getActiveProfile();
         if (profiles.isEmpty()) {
@@ -1435,6 +1432,7 @@ public final class MainActivity extends Activity {
 
     private void toggleProfilesSection() {
         profilesExpanded = !profilesExpanded;
+        setTileActive(R.id.profile_servers_tile, profilesExpanded);
         findViewById(R.id.profiles_list_scroll).setVisibility(
             profilesExpanded ? View.VISIBLE : View.GONE
         );
@@ -1449,6 +1447,7 @@ public final class MainActivity extends Activity {
 
     private void toggleProfileAutomation() {
         profileAutomationExpanded = !profileAutomationExpanded;
+        setTileActive(R.id.profile_tools_tile, profileAutomationExpanded);
         findViewById(R.id.profile_automation_panel).setVisibility(
             profileAutomationExpanded ? View.VISIBLE : View.GONE
         );
@@ -1533,13 +1532,25 @@ public final class MainActivity extends Activity {
         findViewById(R.id.connection_settings_header).setOnClickListener(
             view -> toggleConnectionSettings()
         );
+        findViewById(R.id.connection_tile).setOnClickListener(
+            view -> toggleConnectionSettings()
+        );
         findViewById(R.id.diagnostics_header).setOnClickListener(
+            view -> toggleDiagnostics()
+        );
+        findViewById(R.id.diagnostics_tile).setOnClickListener(
             view -> toggleDiagnostics()
         );
         findViewById(R.id.updates_header).setOnClickListener(
             view -> toggleUpdates()
         );
+        findViewById(R.id.updates_tile).setOnClickListener(
+            view -> toggleUpdates()
+        );
         findViewById(R.id.security_header).setOnClickListener(
+            view -> toggleSecurity()
+        );
+        findViewById(R.id.security_tile).setOnClickListener(
             view -> toggleSecurity()
         );
         renderSettings();
@@ -1589,6 +1600,7 @@ public final class MainActivity extends Activity {
 
     private void toggleConnectionSettings() {
         connectionSettingsExpanded = !connectionSettingsExpanded;
+        setTileActive(R.id.connection_tile, connectionSettingsExpanded);
         setViewsVisible(connectionSettingsExpanded,
             R.id.setting_ipv6,
             R.id.setting_dns,
@@ -1605,6 +1617,7 @@ public final class MainActivity extends Activity {
 
     private void toggleDiagnostics() {
         diagnosticsExpanded = !diagnosticsExpanded;
+        setTileActive(R.id.diagnostics_tile, diagnosticsExpanded);
         setViewsVisible(
             diagnosticsExpanded,
             R.id.open_logs,
@@ -1619,6 +1632,7 @@ public final class MainActivity extends Activity {
 
     private void toggleUpdates() {
         updatesExpanded = !updatesExpanded;
+        setTileActive(R.id.updates_tile, updatesExpanded);
         setViewsVisible(updatesExpanded, R.id.update_app);
         ((TextView) findViewById(R.id.updates_header)).setText(
             updatesExpanded ? R.string.updates_expanded : R.string.updates_collapsed
@@ -1627,6 +1641,7 @@ public final class MainActivity extends Activity {
 
     private void toggleSecurity() {
         securityExpanded = !securityExpanded;
+        setTileActive(R.id.security_tile, securityExpanded);
         setViewsVisible(securityExpanded, R.id.setting_app_lock);
         ((TextView) findViewById(R.id.security_header)).setText(
             securityExpanded ? R.string.security_expanded : R.string.security_collapsed
@@ -1724,6 +1739,7 @@ public final class MainActivity extends Activity {
         findViewById(R.id.rule_apps).setOnClickListener(view -> chooseBypassApps());
         findViewById(R.id.routing_header).setOnClickListener(view -> {
             routingExpanded = !routingExpanded;
+            setTileActive(R.id.routing_tile, routingExpanded);
             setViewsVisible(routingExpanded,
                 R.id.rule_mode,
                 R.id.rule_bypass_ru,
@@ -1738,6 +1754,12 @@ public final class MainActivity extends Activity {
                 routingExpanded ? R.string.routing_expanded : R.string.routing_collapsed
             );
         });
+        findViewById(R.id.routing_tile).setOnClickListener(
+            view -> findViewById(R.id.routing_header).performClick()
+        );
+        findViewById(R.id.apps_tile).setOnClickListener(
+            view -> AppRoutingDialog.show(this)
+        );
         renderRules();
     }
 
@@ -1800,48 +1822,7 @@ public final class MainActivity extends Activity {
     }
 
     private void chooseBypassApps() {
-        Toast.makeText(this, R.string.scanning_apps, Toast.LENGTH_SHORT).show();
-        executor.execute(() -> {
-            List<ApplicationInfo> installed =
-                getPackageManager().getInstalledApplications(PackageManager.GET_META_DATA);
-            List<ApplicationInfo> apps = new ArrayList<>();
-            for (ApplicationInfo item : installed) {
-                if (!getPackageName().equals(item.packageName)) {
-                    apps.add(item);
-                }
-            }
-            apps.sort(Comparator.comparing(item ->
-                item.loadLabel(getPackageManager()).toString().toLowerCase(Locale.ROOT)));
-            runOnUiThread(() -> showBypassAppsDialog(apps));
-        });
-    }
-
-    private void showBypassAppsDialog(List<ApplicationInfo> apps) {
-        String[] labels = new String[apps.size()];
-        boolean[] checked = new boolean[apps.size()];
-        Set<String> selected = new LinkedHashSet<>(appSettings.bypassApps());
-        for (int index = 0; index < apps.size(); index++) {
-            ApplicationInfo item = apps.get(index);
-            String appLabel = item.loadLabel(getPackageManager()).toString();
-            labels[index] = appLabel + "\n" + item.packageName;
-            checked[index] = selected.contains(item.packageName);
-        }
-        new AlertDialog.Builder(this)
-            .setTitle(R.string.bypass_apps)
-            .setMultiChoiceItems(labels, checked, (dialog, which, enabled) -> {
-                String packageName = apps.get(which).packageName;
-                if (enabled) {
-                    selected.add(packageName);
-                } else {
-                    selected.remove(packageName);
-                }
-            })
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(android.R.string.ok, (dialog, which) -> {
-                appSettings.setBypassApps(selected);
-                settingsChanged();
-            })
-            .show();
+        AppRoutingDialog.show(this);
     }
 
     private void settingsChanged() {
@@ -1868,6 +1849,13 @@ public final class MainActivity extends Activity {
                 .setDuration(180)
                 .start();
         }
+    }
+
+    private void setTileActive(int id, boolean active) {
+        TextView tile = findViewById(id);
+        tile.setTextColor(getColor(active ? R.color.accent : R.color.text_primary));
+        tile.animate().scaleX(active ? 1.02f : 1f).scaleY(active ? 1.02f : 1f)
+            .setDuration(160).start();
     }
 
     private void copyDiagnosticReport() {

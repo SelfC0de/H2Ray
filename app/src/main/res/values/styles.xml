@@ -40,7 +40,10 @@
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
         <item name="android:textColor">@color/text_secondary</item>
-        <item name="android:textSize">10sp</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:lineSpacingExtra">4dp</item>
+        <item name="android:paddingStart">2dp</item>
+        <item name="android:paddingEnd">2dp</item>
     </style>
 
     <style name="H2RayNavItemActive" parent="H2RayNavItem">
@@ -60,5 +63,20 @@
         <item name="android:activityOpenExitAnimation">@anim/screen_exit</item>
         <item name="android:activityCloseEnterAnimation">@anim/screen_enter</item>
         <item name="android:activityCloseExitAnimation">@anim/screen_exit</item>
+    </style>
+
+    <style name="H2RayCategoryTile">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">76dp</item>
+        <item name="android:layout_margin">5dp</item>
+        <item name="android:background">@drawable/bg_card</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
     </style>
 </resources>

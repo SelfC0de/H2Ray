@@ -77,6 +77,14 @@ public final class AppSettings {
         preferences.edit().putStringSet("bypass_apps", new HashSet<>(values)).apply();
     }
 
+    public String appRoutingMode() {
+        return preferences.getString("app_routing_mode", "bypass");
+    }
+
+    public void setAppRoutingMode(String value) {
+        preferences.edit().putString("app_routing_mode", value).apply();
+    }
+
     public int mtu() {
         return preferences.getInt("mtu", 1500);
     }

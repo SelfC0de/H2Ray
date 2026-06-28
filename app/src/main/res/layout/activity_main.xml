@@ -12,7 +12,7 @@
         android:clipToPadding="false"
         android:fillViewport="true"
         android:overScrollMode="never"
-        android:paddingBottom="76dp">
+        android:paddingBottom="108dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -50,6 +50,19 @@
                     android:layout_width="0dp"
                     android:layout_height="1dp"
                     android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/app_routing_button"
+                    android:layout_width="44dp"
+                    android:layout_height="40dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="|||"
+                    android:textColor="@color/accent"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/header_menu_button"
@@ -281,7 +294,7 @@
         android:orientation="vertical"
         android:paddingStart="18dp"
         android:paddingEnd="18dp"
-        android:paddingBottom="76dp"
+        android:paddingBottom="108dp"
         android:visibility="gone">
 
         <LinearLayout
@@ -319,6 +332,25 @@
                 android:textSize="16sp" />
         </LinearLayout>
 
+        <GridLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:columnCount="2"
+            android:paddingBottom="6dp">
+
+            <TextView
+                android:id="@+id/profile_servers_tile"
+                style="@style/H2RayCategoryTile"
+                android:layout_columnWeight="1"
+                android:text="@string/profiles_title" />
+
+            <TextView
+                android:id="@+id/profile_tools_tile"
+                style="@style/H2RayCategoryTile"
+                android:layout_columnWeight="1"
+                android:text="@string/category_automation" />
+        </GridLayout>
+
         <TextView
             android:id="@+id/profile_automation_header"
             android:layout_width="match_parent"
@@ -332,7 +364,8 @@
             android:text="@string/profile_automation_collapsed"
             android:textColor="@color/text_primary"
             android:textSize="14sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:visibility="gone" />
 
         <LinearLayout
             android:id="@+id/profile_automation_panel"
@@ -423,7 +456,7 @@
         android:layout_height="match_parent"
         android:background="@color/background"
         android:fillViewport="true"
-        android:paddingBottom="84dp"
+        android:paddingBottom="112dp"
         android:visibility="gone">
 
         <LinearLayout
@@ -442,6 +475,25 @@
                 android:textSize="23sp"
                 android:textStyle="bold" />
 
+            <GridLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="2"
+                android:paddingBottom="6dp">
+
+                <TextView
+                    android:id="@+id/routing_tile"
+                    style="@style/H2RayCategoryTile"
+                    android:layout_columnWeight="1"
+                    android:text="@string/category_routing" />
+
+                <TextView
+                    android:id="@+id/apps_tile"
+                    style="@style/H2RayCategoryTile"
+                    android:layout_columnWeight="1"
+                    android:text="@string/category_apps" />
+            </GridLayout>
+
             <TextView
                 android:id="@+id/routing_header"
                 android:layout_width="match_parent"
@@ -455,7 +507,8 @@
                 android:text="@string/routing_collapsed"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/rule_mode"
@@ -586,7 +639,7 @@
         android:layout_height="match_parent"
         android:background="@color/background"
         android:fillViewport="true"
-        android:paddingBottom="76dp"
+        android:paddingBottom="108dp"
         android:visibility="gone">
 
         <LinearLayout
@@ -605,6 +658,37 @@
                 android:textSize="23sp"
                 android:textStyle="bold" />
 
+            <GridLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="2"
+                android:paddingBottom="6dp">
+
+                <TextView
+                    android:id="@+id/connection_tile"
+                    style="@style/H2RayCategoryTile"
+                    android:layout_columnWeight="1"
+                    android:text="@string/category_connection" />
+
+                <TextView
+                    android:id="@+id/diagnostics_tile"
+                    style="@style/H2RayCategoryTile"
+                    android:layout_columnWeight="1"
+                    android:text="@string/category_diagnostics" />
+
+                <TextView
+                    android:id="@+id/updates_tile"
+                    style="@style/H2RayCategoryTile"
+                    android:layout_columnWeight="1"
+                    android:text="@string/category_updates" />
+
+                <TextView
+                    android:id="@+id/security_tile"
+                    style="@style/H2RayCategoryTile"
+                    android:layout_columnWeight="1"
+                    android:text="@string/category_security" />
+            </GridLayout>
+
             <TextView
                 android:id="@+id/connection_settings_header"
                 android:layout_width="match_parent"
@@ -619,7 +703,8 @@
                 android:text="@string/connection_collapsed"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:visibility="gone" />
 
             <Switch
                 android:id="@+id/setting_ipv6"
@@ -720,7 +805,8 @@
                 android:text="@string/diagnostics_collapsed"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/open_logs"
@@ -768,7 +854,8 @@
                 android:text="@string/updates_collapsed"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:visibility="gone" />
 
             <Button
                 android:id="@+id/update_app"
@@ -796,7 +883,8 @@
                 android:text="@string/security_collapsed"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:visibility="gone" />
 
             <Switch
                 android:id="@+id/setting_app_lock"
@@ -816,13 +904,19 @@
     <LinearLayout
         android:id="@+id/bottom_navigation"
         android:layout_width="match_parent"
-        android:layout_height="74dp"
+        android:layout_height="88dp"
         android:layout_gravity="bottom"
-        android:background="@color/navigation"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_bottom_navigation"
+        android:elevation="12dp"
         android:gravity="center"
         android:orientation="horizontal"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp">
+        android:paddingStart="6dp"
+        android:paddingTop="5dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="5dp">
 
         <TextView
             android:id="@+id/nav_home"

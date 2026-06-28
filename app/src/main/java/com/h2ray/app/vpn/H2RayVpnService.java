@@ -152,13 +152,7 @@ public final class H2RayVpnService extends VpnService {
                     .addAddress("10.10.0.2", 30)
                     .addRoute("0.0.0.0", 0)
                     .addDnsServer(settings.dns());
-                for (String packageName : settings.bypassApps()) {
-                    try {
-                        builder.addDisallowedApplication(packageName);
-                    } catch (android.content.pm.PackageManager.NameNotFoundException error) {
-                        logStore.add("WARN", "Приложение правила не найдено: " + packageName);
-                    }
-                }
+                configureApplicationRouting(builder, settings);
                 builder.addAddress("fd00:10:10::2", 126)
                     .addRoute("::", 0);
 
@@ -323,6 +317,28 @@ public final class H2RayVpnService extends VpnService {
                 new InetSocketAddress(endpoint.address, endpoint.port),
                 timeoutSeconds * 1000
             );
+        }
+    }
+
+    private void configureApplicationRouting(Builder builder, AppSettings settings) {
+        boolean onlySelected = "only".equals(settings.appRoutingMode());
+        if (onlySelected && settings.bypassApps().isEmpty()) {
+            try {
+                builder.addAllowedApplication(getPackageName());
+            } catch (android.content.pm.PackageManager.NameNotFoundException ignored) {
+            }
+            return;
+        }
+        for (String packageName : settings.bypassApps()) {
+            try {
+                if (onlySelected) {
+                    builder.addAllowedApplication(packageName);
+                } else {
+                    builder.addDisallowedApplication(packageName);
+                }
+            } catch (android.content.pm.PackageManager.NameNotFoundException error) {
+                logStore.add("WARN", "Приложение правила не найдено: " + packageName);
+            }
         }
     }
 
