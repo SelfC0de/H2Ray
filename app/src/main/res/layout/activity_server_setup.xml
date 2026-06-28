@@ -109,15 +109,15 @@
 
             <FrameLayout
                 android:layout_width="0dp"
-                android:layout_height="46dp"
+                android:layout_height="50dp"
                 android:layout_marginTop="7dp"
-                android:layout_weight="0.62">
+                android:layout_weight="0.58">
 
                 <EditText
                     android:id="@+id/ssh_password"
                     style="@style/H2RayServerInput"
                     android:layout_width="match_parent"
-                    android:layout_height="46dp"
+                    android:layout_height="50dp"
                     android:layout_marginTop="0dp"
                     android:hint="@string/ssh_password"
                     android:inputType="textPassword"
@@ -139,15 +139,21 @@
                 android:id="@+id/test_ssh"
                 style="@style/H2RayServerButton"
                 android:layout_width="0dp"
+                android:layout_height="50dp"
                 android:layout_marginStart="8dp"
-                android:layout_weight="0.38"
+                android:layout_weight="0.42"
+                android:gravity="center"
+                android:minWidth="0dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:singleLine="true"
                 android:text="@string/test_ssh" />
         </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="22dp"
             android:text="@string/panel_credentials"
             android:textColor="@color/accent"
             android:textSize="14sp"

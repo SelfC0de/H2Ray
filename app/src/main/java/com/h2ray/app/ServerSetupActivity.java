@@ -71,6 +71,7 @@ public final class ServerSetupActivity extends Activity {
         panelLogin = findViewById(R.id.panel_login);
         panelResult = findViewById(R.id.panel_result);
         testButton = findViewById(R.id.test_ssh);
+        testButton.setTextSize(11);
         installButton = findViewById(R.id.install_panel);
         readButton = findViewById(R.id.read_panel);
         resetButton = findViewById(R.id.reset_panel_credentials);

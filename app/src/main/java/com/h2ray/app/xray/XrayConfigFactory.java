@@ -204,7 +204,7 @@ public final class XrayConfigFactory {
 
         String security = stream.optString("security", "none");
         if ("reality".equalsIgnoreCase(security)) {
-            normalizeRealitySettings(stream);
+            normalizeRealitySettings(outbound, stream);
             if (!"raw".equals(network) && !"xhttp".equals(network) && !"grpc".equals(network)) {
                 throw new JSONException("REALITY поддерживает только RAW, XHTTP и gRPC");
             }
@@ -241,7 +241,10 @@ public final class XrayConfigFactory {
         }
     }
 
-    private static void normalizeRealitySettings(JSONObject stream) throws JSONException {
+    private static void normalizeRealitySettings(
+        JSONObject outbound,
+        JSONObject stream
+    ) throws JSONException {
         JSONObject source = stream.optJSONObject("realitySettings");
         if (source == null) {
             source = new JSONObject();
@@ -251,10 +254,22 @@ public final class XrayConfigFactory {
         if (password.trim().isEmpty()) {
             password = stringValue(source, "publicKey");
         }
+        String serverName = firstNonBlank(
+            stringValue(source, "serverName"),
+            stringValue(source, "server_name"),
+            stringValue(source, "sni"),
+            firstString(source.optJSONArray("serverNames")),
+            outboundServerAddress(outbound)
+        );
+        if (serverName.isEmpty()) {
+            throw new JSONException(
+                "REALITY: отсутствует SNI/serverName. Укажите домен маскировки сервера"
+            );
+        }
 
         JSONObject client = new JSONObject(source.toString());
         client.put("fingerprint", valueOrDefault(source, "fingerprint", "chrome"));
-        client.put("serverName", stringValue(source, "serverName"));
+        client.put("serverName", serverName);
         client.put("password", password);
         client.put("shortId", stringValue(source, "shortId"));
         client.remove("publicKey");
@@ -262,6 +277,46 @@ public final class XrayConfigFactory {
         client.remove("privateKey");
         client.remove("shortIds");
         stream.put("realitySettings", client);
+    }
+
+    private static String outboundServerAddress(JSONObject outbound) {
+        JSONObject settings = outbound.optJSONObject("settings");
+        if (settings == null) {
+            return "";
+        }
+        JSONArray vnext = settings.optJSONArray("vnext");
+        if (vnext != null && vnext.length() > 0) {
+            JSONObject server = vnext.optJSONObject(0);
+            return server == null ? "" : server.optString("address", "").trim();
+        }
+        JSONArray servers = settings.optJSONArray("servers");
+        if (servers != null && servers.length() > 0) {
+            JSONObject server = servers.optJSONObject(0);
+            return server == null ? "" : server.optString("address", "").trim();
+        }
+        return "";
+    }
+
+    private static String firstString(JSONArray values) {
+        if (values == null) {
+            return "";
+        }
+        for (int index = 0; index < values.length(); index++) {
+            String value = values.optString(index, "").trim();
+            if (!value.isEmpty()) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty()) {
+                return value.trim();
+            }
+        }
+        return "";
     }
 
     private static String valueOrDefault(JSONObject source, String key, String fallback) {
