@@ -2,7 +2,7 @@
 <resources>
     <style name="Theme.H2Ray.Launcher" parent="Theme.H2Ray">
         <item name="android:windowSplashScreenBackground">@color/splash_blue</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_animated</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_h2ray_mark</item>
         <item name="android:windowSplashScreenIconBackgroundColor">@color/surface</item>
         <item name="android:windowSplashScreenBrandingImage">@drawable/splash_branding</item>
     </style>

@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_splash">
+    android:background="@drawable/bg_welcome">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -17,6 +17,7 @@
             android:layout_width="196dp"
             android:layout_height="196dp"
             android:adjustViewBounds="false"
+            android:alpha="0"
             android:contentDescription="@null"
             android:scaleType="centerInside"
             android:src="@drawable/h2ray_logo" />
@@ -26,10 +27,20 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
+            android:alpha="0"
             android:letterSpacing="0.04"
             android:text="@string/private_connect"
             android:textColor="@color/text_primary"
             android:textSize="25sp"
             android:textStyle="bold" />
+
+        <View
+            android:id="@+id/splash_accent"
+            android:layout_width="112dp"
+            android:layout_height="2dp"
+            android:layout_marginTop="16dp"
+            android:alpha="0"
+            android:background="@color/accent"
+            android:scaleX="0" />
     </LinearLayout>
 </FrameLayout>

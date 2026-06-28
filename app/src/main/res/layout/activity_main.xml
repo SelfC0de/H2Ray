@@ -658,36 +658,48 @@
                 android:textSize="23sp"
                 android:textStyle="bold" />
 
-            <GridLayout
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:columnCount="2"
+                android:orientation="vertical"
                 android:paddingBottom="6dp">
 
-                <TextView
-                    android:id="@+id/connection_tile"
-                    style="@style/H2RayCategoryTile"
-                    android:layout_columnWeight="1"
-                    android:text="@string/category_connection" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="86dp"
+                    android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/diagnostics_tile"
-                    style="@style/H2RayCategoryTile"
-                    android:layout_columnWeight="1"
-                    android:text="@string/category_diagnostics" />
+                    <TextView
+                        android:id="@+id/connection_tile"
+                        style="@style/H2RayCategoryTile"
+                        android:layout_weight="1"
+                        android:text="@string/category_connection" />
 
-                <TextView
-                    android:id="@+id/updates_tile"
-                    style="@style/H2RayCategoryTile"
-                    android:layout_columnWeight="1"
-                    android:text="@string/category_updates" />
+                    <TextView
+                        android:id="@+id/diagnostics_tile"
+                        style="@style/H2RayCategoryTile"
+                        android:layout_weight="1"
+                        android:text="@string/category_diagnostics" />
+                </LinearLayout>
 
-                <TextView
-                    android:id="@+id/security_tile"
-                    style="@style/H2RayCategoryTile"
-                    android:layout_columnWeight="1"
-                    android:text="@string/category_security" />
-            </GridLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="86dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/updates_tile"
+                        style="@style/H2RayCategoryTile"
+                        android:layout_weight="1"
+                        android:text="@string/category_updates" />
+
+                    <TextView
+                        android:id="@+id/security_tile"
+                        style="@style/H2RayCategoryTile"
+                        android:layout_weight="1"
+                        android:text="@string/category_security" />
+                </LinearLayout>
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/connection_settings_header"
