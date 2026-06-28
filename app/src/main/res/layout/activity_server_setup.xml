@@ -58,6 +58,18 @@
             android:textSize="14sp"
             android:textStyle="bold" />
 
+        <TextView
+            android:id="@+id/server_setup_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:textColor="@color/text_secondary"
+            android:textIsSelectable="true"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
         <EditText
             android:id="@+id/ssh_host"
             style="@style/H2RayServerInput"
@@ -216,17 +228,5 @@
                 android:text="@string/open_panel_browser" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/server_setup_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/bg_stat"
-            android:minHeight="64dp"
-            android:padding="14dp"
-            android:text="@string/server_setup_idle"
-            android:textColor="@color/text_secondary"
-            android:textIsSelectable="true"
-            android:textSize="12sp" />
     </LinearLayout>
 </ScrollView>

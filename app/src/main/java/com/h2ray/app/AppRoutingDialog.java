@@ -45,23 +45,40 @@ public final class AppRoutingDialog {
         Toast.makeText(activity, R.string.scanning_apps, Toast.LENGTH_SHORT).show();
         ExecutorService executor = Executors.newSingleThreadExecutor();
         executor.execute(() -> {
-            PackageManager manager = activity.getPackageManager();
-            List<ApplicationInfo> apps = new ArrayList<>();
-            for (ApplicationInfo app :
-                manager.getInstalledApplications(PackageManager.GET_META_DATA)) {
-                boolean system = (app.flags & ApplicationInfo.FLAG_SYSTEM) != 0
-                    || (app.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0;
-                if (!system && !activity.getPackageName().equals(app.packageName)) {
-                    apps.add(app);
+            try {
+                PackageManager manager = activity.getPackageManager();
+                List<ApplicationInfo> apps = new ArrayList<>();
+                for (ApplicationInfo app :
+                    manager.getInstalledApplications(0)) {
+                    boolean system = (app.flags & ApplicationInfo.FLAG_SYSTEM) != 0
+                        || (app.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0;
+                    if (!system
+                        && app.enabled
+                        && !activity.getPackageName().equals(app.packageName)
+                        && manager.getLaunchIntentForPackage(app.packageName) != null) {
+                        apps.add(app);
+                    }
                 }
+                apps.sort(Comparator.comparing(
+                    app -> safeLabel(manager, app).toLowerCase(Locale.ROOT)
+                ));
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    try {
+                        if (!activity.isFinishing() && !activity.isDestroyed()) {
+                            build(activity, apps);
+                        }
+                    } catch (RuntimeException error) {
+                        showScanError(activity, error);
+                    } finally {
+                        executor.shutdown();
+                    }
+                });
+            } catch (RuntimeException error) {
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    showScanError(activity, error);
+                    executor.shutdown();
+                });
             }
-            apps.sort(Comparator.comparing(
-                app -> app.loadLabel(manager).toString().toLowerCase(Locale.ROOT)
-            ));
-            new Handler(Looper.getMainLooper()).post(() -> {
-                build(activity, apps);
-                executor.shutdown();
-            });
         });
     }
 
@@ -300,7 +317,7 @@ public final class AppRoutingDialog {
             String value = query.trim().toLowerCase(Locale.ROOT);
             visible.clear();
             for (ApplicationInfo app : all) {
-                String label = app.loadLabel(activity.getPackageManager()).toString();
+                String label = safeLabel(activity.getPackageManager(), app);
                 if (value.isEmpty()
                     || label.toLowerCase(Locale.ROOT).contains(value)
                     || app.packageName.toLowerCase(Locale.ROOT).contains(value)) {
@@ -332,8 +349,14 @@ public final class AppRoutingDialog {
                 recycled.setTag(row);
             }
             ApplicationInfo app = visible.get(position);
-            row.icon.setImageDrawable(app.loadIcon(activity.getPackageManager()));
-            row.name.setText(app.loadLabel(activity.getPackageManager()));
+            try {
+                row.icon.setImageDrawable(app.loadIcon(activity.getPackageManager()));
+            } catch (RuntimeException error) {
+                row.icon.setImageDrawable(
+                    activity.getPackageManager().getDefaultActivityIcon()
+                );
+            }
+            row.name.setText(safeLabel(activity.getPackageManager(), app));
             row.packageName.setText(app.packageName);
             row.check.setOnCheckedChangeListener(null);
             row.check.setChecked(selected.contains(app.packageName));
@@ -348,6 +371,34 @@ public final class AppRoutingDialog {
             row.root.setOnClickListener(view -> row.check.setChecked(!row.check.isChecked()));
             return recycled;
         }
+    }
+
+    private static String safeLabel(PackageManager manager, ApplicationInfo app) {
+        try {
+            CharSequence label = app.loadLabel(manager);
+            return label == null || label.toString().trim().isEmpty()
+                ? app.packageName
+                : label.toString();
+        } catch (RuntimeException error) {
+            return app.packageName;
+        }
+    }
+
+    private static void showScanError(Activity activity, Throwable error) {
+        if (activity.isFinishing() || activity.isDestroyed()) {
+            return;
+        }
+        String message = error.getMessage();
+        Toast.makeText(
+            activity,
+            activity.getString(
+                R.string.apps_scan_failed,
+                message == null || message.trim().isEmpty()
+                    ? error.getClass().getSimpleName()
+                    : message
+            ),
+            Toast.LENGTH_LONG
+        ).show();
     }
 
     private static final class Row {

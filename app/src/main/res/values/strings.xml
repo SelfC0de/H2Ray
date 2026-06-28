@@ -20,7 +20,6 @@
     <string name="reset_panel_credentials">Установить username и password</string>
     <string name="panel_ready">Панель доступна</string>
     <string name="open_panel_browser">Открыть в браузере</string>
-    <string name="server_setup_idle">Введите SSH-данные и проверьте подключение. Пароль SSH не сохраняется.</string>
     <string name="ssh_host_key_title">Проверка SSH host key</string>
     <string name="ssh_host_key_message">Сверьте отпечаток сервера:\n\n%1$s\n\nТип ключа: %2$s\n\nДоверять этому серверу?</string>
     <string name="ssh_verified">SSH подключение проверено</string>
@@ -179,6 +178,7 @@
     <string name="apps_selected_count">Выбрано: %1$d</string>
     <string name="apply">Применить</string>
     <string name="apps_saved">Правила приложений сохранены</string>
+    <string name="apps_scan_failed">Не удалось открыть список приложений: %1$s</string>
     <string name="category_servers">Серверы\n%1$d профилей</string>
     <string name="category_automation">Автоматизация\nБыстрый выбор</string>
     <string name="category_routing">Маршрутизация\nДомены и DNS</string>

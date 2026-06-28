@@ -402,6 +402,7 @@ public final class ServerSetupActivity extends Activity {
         }
         if (host.isEmpty() || host.contains("/") || host.contains(" ")
             || port < 1 || port > 65535 || username.isEmpty() || password.isEmpty()) {
+            status.setVisibility(View.VISIBLE);
             status.setText("Проверьте IP, порт, username и password");
             status.setTextColor(getColor(R.color.error));
             return null;
@@ -423,6 +424,7 @@ public final class ServerSetupActivity extends Activity {
         }
         busy = true;
         setButtonsEnabled(false);
+        status.setVisibility(View.VISIBLE);
         status.setText(message);
         status.setTextColor(getColor(R.color.text_secondary));
         return true;
@@ -436,6 +438,7 @@ public final class ServerSetupActivity extends Activity {
     private void fail(Exception error) {
         runOnUiThread(() -> {
             end();
+            status.setVisibility(View.VISIBLE);
             String message = error.getMessage() == null
                 ? error.getClass().getSimpleName()
                 : error.getMessage();
