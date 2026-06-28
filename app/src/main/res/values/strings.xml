@@ -110,6 +110,9 @@
     <string name="updates_expanded">Обновления  ▴</string>
     <string name="auto_reconnect">Переподключаться при смене сети</string>
     <string name="restore_after_boot">Восстанавливать VPN после перезагрузки</string>
+    <string name="parallel_dns">Параллельные DNS-запросы</string>
+    <string name="fake_dns">FakeDNS · экспертный режим</string>
+    <string name="happy_eyeballs">Happy Eyeballs для IPv4/IPv6</string>
     <string name="retry_policy">Попыток: %1$d · тайм-аут: %2$d сек.</string>
     <string name="retry_policy_title">Повторное подключение</string>
     <string name="copy_diagnostic_report">Копировать обезличенный отчёт</string>

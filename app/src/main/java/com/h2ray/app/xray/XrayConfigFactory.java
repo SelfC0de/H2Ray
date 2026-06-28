@@ -24,6 +24,7 @@ public final class XrayConfigFactory {
         proxy.remove("sendThrough");
         proxy.put("tag", "proxy");
         normalizeStreamSettings(proxy);
+        applySocketPolicy(proxy, settings);
 
         JSONArray runtimeOutbounds = new JSONArray().put(proxy);
         runtimeOutbounds.put(new JSONObject()
@@ -65,15 +66,30 @@ public final class XrayConfigFactory {
                     .put("10.10.0.1/30")
                     .put("fd00:10:10::1/126"))
                 .put("dns", new JSONArray().put(settings.dns())));
+        JSONArray sniffers = new JSONArray().put("http").put("tls").put("quic");
+        if (settings.fakeDns()) {
+            sniffers.put("fakedns");
+        }
         tunInbound.put("sniffing", new JSONObject()
             .put("enabled", settings.sniffing())
-            .put("routeOnly", true)
-            .put("destOverride", new JSONArray().put("http").put("tls").put("quic")));
+            .put("routeOnly", !settings.fakeDns())
+            .put("destOverride", sniffers));
 
         config.put("log", new JSONObject().put("loglevel", "warning"));
+        JSONArray dnsServers = new JSONArray();
+        if (settings.fakeDns()) {
+            dnsServers.put("fakedns");
+            config.put("fakedns", new JSONObject()
+                .put("ipPool", "198.18.0.0/15")
+                .put("poolSize", 65535));
+        } else {
+            config.remove("fakedns");
+        }
+        dnsServers.put(settings.xrayDns());
         config.put("dns", new JSONObject()
             .put("queryStrategy", settings.ipv6() ? "UseIP" : "UseIPv4")
-            .put("servers", new JSONArray().put(settings.xrayDns())));
+            .put("enableParallelQuery", settings.parallelDns())
+            .put("servers", dnsServers));
         config.put("inbounds", new JSONArray().put(tunInbound));
         config.put("outbounds", runtimeOutbounds);
         JSONArray rules = new JSONArray();
@@ -197,7 +213,31 @@ public final class XrayConfigFactory {
             JSONObject tls = stream.getJSONObject("tlsSettings");
             tls.remove("allowInsecure");
             tls.remove("verifyPeerCertInNames");
-            tls.remove("echForceQuery");
+        }
+    }
+
+    private static void applySocketPolicy(JSONObject outbound, AppSettings settings)
+        throws JSONException {
+        JSONObject stream = outbound.optJSONObject("streamSettings");
+        if (stream == null) {
+            stream = new JSONObject();
+            outbound.put("streamSettings", stream);
+        }
+        JSONObject sockopt = stream.optJSONObject("sockopt");
+        if (sockopt == null) {
+            sockopt = new JSONObject();
+            stream.put("sockopt", sockopt);
+        }
+        sockopt.put("tcpUserTimeout", settings.connectionTimeoutSeconds() * 1000);
+        if (settings.happyEyeballs() && settings.ipv6()) {
+            sockopt.put("domainStrategy", "UseIP");
+            sockopt.put("happyEyeballs", new JSONObject()
+                .put("tryDelayMs", 250)
+                .put("prioritizeIPv6", false)
+                .put("interleave", 1)
+                .put("maxConcurrentTry", 4));
+        } else {
+            sockopt.remove("happyEyeballs");
         }
     }
 
@@ -212,29 +252,21 @@ public final class XrayConfigFactory {
             password = stringValue(source, "publicKey");
         }
 
-        JSONObject client = new JSONObject()
-            .put("fingerprint", valueOrDefault(source, "fingerprint", "chrome"))
-            .put("serverName", stringValue(source, "serverName"))
-            .put("password", password)
-            .put("shortId", stringValue(source, "shortId"));
-
-        copyNonEmpty(source, client, "mldsa65Verify");
-        copyNonEmpty(source, client, "spiderX");
-        copyNonEmpty(source, client, "masterKeyLog");
+        JSONObject client = new JSONObject(source.toString());
+        client.put("fingerprint", valueOrDefault(source, "fingerprint", "chrome"));
+        client.put("serverName", stringValue(source, "serverName"));
+        client.put("password", password);
+        client.put("shortId", stringValue(source, "shortId"));
+        client.remove("publicKey");
+        client.remove("serverNames");
+        client.remove("privateKey");
+        client.remove("shortIds");
         stream.put("realitySettings", client);
     }
 
     private static String valueOrDefault(JSONObject source, String key, String fallback) {
         String value = stringValue(source, key);
         return value.trim().isEmpty() ? fallback : value;
-    }
-
-    private static void copyNonEmpty(JSONObject source, JSONObject destination, String key)
-        throws JSONException {
-        String value = stringValue(source, key);
-        if (!value.trim().isEmpty()) {
-            destination.put(key, value);
-        }
     }
 
     private static String stringValue(JSONObject source, String key) {

@@ -1516,11 +1516,27 @@ public final class MainActivity extends Activity {
 
     private void configureSettings() {
         Switch ipv6 = findViewById(R.id.setting_ipv6);
+        Switch parallelDns = findViewById(R.id.setting_parallel_dns);
+        Switch fakeDns = findViewById(R.id.setting_fake_dns);
+        Switch happyEyeballs = findViewById(R.id.setting_happy_eyeballs);
         Switch autoReconnect = findViewById(R.id.setting_auto_reconnect);
         Switch restoreBoot = findViewById(R.id.setting_restore_boot);
         Switch appLock = findViewById(R.id.setting_app_lock);
         ipv6.setOnCheckedChangeListener((button, value) -> {
             appSettings.setIpv6(value);
+            happyEyeballs.setEnabled(value);
+            settingsChanged();
+        });
+        parallelDns.setOnCheckedChangeListener((button, value) -> {
+            appSettings.setParallelDns(value);
+            settingsChanged();
+        });
+        fakeDns.setOnCheckedChangeListener((button, value) -> {
+            appSettings.setFakeDns(value);
+            settingsChanged();
+        });
+        happyEyeballs.setOnCheckedChangeListener((button, value) -> {
+            appSettings.setHappyEyeballs(value);
             settingsChanged();
         });
         autoReconnect.setOnCheckedChangeListener((button, value) ->
@@ -1578,6 +1594,13 @@ public final class MainActivity extends Activity {
 
     private void renderSettings() {
         ((Switch) findViewById(R.id.setting_ipv6)).setChecked(appSettings.ipv6());
+        ((Switch) findViewById(R.id.setting_parallel_dns)).setChecked(
+            appSettings.parallelDns()
+        );
+        ((Switch) findViewById(R.id.setting_fake_dns)).setChecked(appSettings.fakeDns());
+        Switch happyEyeballs = findViewById(R.id.setting_happy_eyeballs);
+        happyEyeballs.setChecked(appSettings.happyEyeballs());
+        happyEyeballs.setEnabled(appSettings.ipv6());
         ((Switch) findViewById(R.id.setting_auto_reconnect)).setChecked(
             appSettings.autoReconnect()
         );
@@ -1628,6 +1651,9 @@ public final class MainActivity extends Activity {
             R.id.setting_ipv6,
             R.id.setting_dns,
             R.id.setting_mtu,
+            R.id.setting_parallel_dns,
+            R.id.setting_fake_dns,
+            R.id.setting_happy_eyeballs,
             R.id.setting_auto_reconnect,
             R.id.setting_restore_boot,
             R.id.setting_retry_policy);
@@ -1913,6 +1939,9 @@ public final class MainActivity extends Activity {
             + "\nПротокол: " + (profile == null ? "—" : profile.protocol)
             + "\nIPv6: " + appSettings.ipv6()
             + "\nDNS: " + appSettings.dns()
+            + "\nПараллельный DNS: " + appSettings.parallelDns()
+            + "\nFakeDNS: " + appSettings.fakeDns()
+            + "\nHappy Eyeballs: " + appSettings.happyEyeballs()
             + "\nМаршрутизация: " + appSettings.routingMode()
             + "\nАвтопереподключение: " + appSettings.autoReconnect()
             + "\nОшибка: " + redactDiagnostic(connectionStatusStore.getError());

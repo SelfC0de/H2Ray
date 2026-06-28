@@ -59,6 +59,30 @@ public final class AppSettings {
             .apply();
     }
 
+    public boolean parallelDns() {
+        return preferences.getBoolean("parallel_dns", true);
+    }
+
+    public void setParallelDns(boolean value) {
+        preferences.edit().putBoolean("parallel_dns", value).apply();
+    }
+
+    public boolean fakeDns() {
+        return preferences.getBoolean("fake_dns", false);
+    }
+
+    public void setFakeDns(boolean value) {
+        preferences.edit().putBoolean("fake_dns", value).apply();
+    }
+
+    public boolean happyEyeballs() {
+        return preferences.getBoolean("happy_eyeballs", true);
+    }
+
+    public void setHappyEyeballs(boolean value) {
+        preferences.edit().putBoolean("happy_eyeballs", value).apply();
+    }
+
     public String customDomains() {
         return preferences.getString("custom_domains", "");
     }
