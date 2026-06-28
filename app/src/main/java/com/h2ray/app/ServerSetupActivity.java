@@ -7,6 +7,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
+import android.text.method.PasswordTransformationMethod;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
@@ -89,6 +90,20 @@ public final class ServerSetupActivity extends Activity {
         }
 
         findViewById(R.id.server_setup_back).setOnClickListener(view -> finish());
+        findViewById(R.id.generate_panel_username).setOnClickListener(
+            view -> panelUserInput.setText("h2ray_" + randomToken(8))
+        );
+        findViewById(R.id.generate_panel_password).setOnClickListener(
+            view -> panelPasswordInput.setText(randomToken(20))
+        );
+        Button sshPasswordToggle = findViewById(R.id.toggle_ssh_password);
+        Button panelPasswordToggle = findViewById(R.id.toggle_panel_password);
+        sshPasswordToggle.setOnClickListener(
+            view -> togglePassword(sshPasswordInput, sshPasswordToggle)
+        );
+        panelPasswordToggle.setOnClickListener(
+            view -> togglePassword(panelPasswordInput, panelPasswordToggle)
+        );
         testButton.setOnClickListener(view -> inspectHost());
         installButton.setOnClickListener(view -> confirmInstall());
         readButton.setOnClickListener(view -> readPanel());
@@ -468,6 +483,16 @@ public final class ServerSetupActivity extends Activity {
             result.append(alphabet.charAt(random.nextInt(alphabet.length())));
         }
         return result.toString();
+    }
+
+    private void togglePassword(EditText input, Button button) {
+        boolean hidden = input.getTransformationMethod() instanceof
+            PasswordTransformationMethod;
+        input.setTransformationMethod(
+            hidden ? null : PasswordTransformationMethod.getInstance()
+        );
+        button.setText(hidden ? R.string.hide_password : R.string.show_password);
+        input.setSelection(input.length());
     }
 
     private void applyInsets() {
