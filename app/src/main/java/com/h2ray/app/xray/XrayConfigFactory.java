@@ -93,13 +93,53 @@ public final class XrayConfigFactory {
         config.put("inbounds", new JSONArray().put(tunInbound));
         config.put("outbounds", runtimeOutbounds);
         JSONArray rules = new JSONArray();
+        String preset = settings.routingPreset();
+        boolean customRuPreset = GeoDataManager.DEFAULT_RU.equals(preset)
+            || GeoDataManager.WHITELIST_RU.equals(preset);
+        String routingMode = customRuPreset ? "global" : settings.routingMode();
         if (!settings.ipv6()) {
             rules.put(new JSONObject()
                 .put("type", "field")
                 .put("ip", new JSONArray().put("::/0"))
                 .put("outboundTag", "block"));
         }
-        if (settings.blockAds()) {
+        if (customRuPreset) {
+            rules.put(new JSONObject()
+                .put("type", "field")
+                .put("domain", new JSONArray()
+                    .put("geosite:win-spy")
+                    .put("geosite:torrent")
+                    .put("geosite:category-ads"))
+                .put("outboundTag", "block"));
+            JSONArray directDomains = new JSONArray()
+                .put("geosite:private")
+                .put("geosite:whitelist");
+            JSONArray directIps = new JSONArray()
+                .put("geoip:private")
+                .put("geoip:whitelist");
+            if (GeoDataManager.DEFAULT_RU.equals(preset)) {
+                directDomains
+                    .put("geosite:category-ru")
+                    .put("geosite:microsoft")
+                    .put("geosite:apple")
+                    .put("geosite:epicgames")
+                    .put("geosite:riot")
+                    .put("geosite:escapefromtarkov")
+                    .put("geosite:steam")
+                    .put("geosite:twitch")
+                    .put("geosite:pinterest")
+                    .put("geosite:faceit");
+                directIps.put("geoip:direct");
+            }
+            rules.put(new JSONObject()
+                .put("type", "field")
+                .put("domain", directDomains)
+                .put("outboundTag", "direct"));
+            rules.put(new JSONObject()
+                .put("type", "field")
+                .put("ip", directIps)
+                .put("outboundTag", "direct"));
+        } else if (settings.blockAds()) {
             rules.put(new JSONObject()
                 .put("type", "field")
                 .put("domain", new JSONArray().put("geosite:category-ads-all"))
@@ -114,29 +154,29 @@ public final class XrayConfigFactory {
         }
         JSONArray customRules = customRules(
             settings.customDomains(),
-            "proxy_only".equals(settings.routingMode()) ? "proxy" : "direct"
+            "proxy_only".equals(routingMode) ? "proxy" : "direct"
         );
         for (int index = 0; index < customRules.length(); index++) {
             rules.put(customRules.getJSONObject(index));
         }
-        if ("direct".equals(settings.routingMode())) {
+        if ("direct".equals(routingMode)) {
             rules.put(new JSONObject()
                 .put("type", "field")
                 .put("network", "tcp,udp")
                 .put("outboundTag", "direct"));
-        } else if ("rules".equals(settings.routingMode()) && settings.bypassPrivate()) {
+        } else if ("rules".equals(routingMode) && settings.bypassPrivate()) {
             rules.put(new JSONObject()
                 .put("type", "field")
                 .put("ip", privateNetworks)
                 .put("outboundTag", "direct"));
         }
-        if ("proxy_only".equals(settings.routingMode())) {
+        if ("proxy_only".equals(routingMode)) {
             rules.put(new JSONObject()
                 .put("type", "field")
                 .put("network", "tcp,udp")
                 .put("outboundTag", "direct"));
         }
-        if ("rules".equals(settings.routingMode()) && settings.bypassRu()) {
+        if ("rules".equals(routingMode) && settings.bypassRu()) {
             rules.put(new JSONObject()
                 .put("type", "field")
                 .put("domain", new JSONArray()

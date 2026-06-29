@@ -56,6 +56,7 @@ import com.h2ray.app.network.UpdateChecker;
 import com.h2ray.app.update.UpdateDownloadManager;
 import com.h2ray.app.vpn.H2RayVpnService;
 import com.h2ray.app.xray.ServerEndpoint;
+import com.h2ray.app.xray.GeoDataManager;
 import com.h2ray.app.xray.ProfileImporter;
 import com.h2ray.app.xray.XrayBridge;
 import com.h2ray.app.xray.XrayConfigFactory;
@@ -114,6 +115,7 @@ public final class MainActivity extends Activity {
     private UpdateDownloadManager updateDownloadManager;
     private final AtomicBoolean ipLookupRunning = new AtomicBoolean(false);
     private final AtomicBoolean updateCheckRunning = new AtomicBoolean(false);
+    private final AtomicBoolean geoUpdateRunning = new AtomicBoolean(false);
     private volatile UpdateChecker.Result latestUpdate;
     private volatile long lastDirectIpAttempt;
     private volatile long lastProxyIpAttempt;
@@ -282,6 +284,7 @@ public final class MainActivity extends Activity {
         }
         checkForUpdates(false);
         updateSubscriptions(false);
+        checkGeoDataUpdate();
         startHomeAnimations();
     }
 
@@ -1811,7 +1814,19 @@ public final class MainActivity extends Activity {
             appSettings.setSniffing(value);
             settingsChanged();
         });
+        ((Switch) findViewById(R.id.rule_geo_auto_update))
+            .setOnCheckedChangeListener((button, value) ->
+                appSettings.setAutoUpdateGeoData(value));
         findViewById(R.id.rule_mode).setOnClickListener(view -> chooseRoutingMode());
+        findViewById(R.id.rule_routing_preset).setOnClickListener(
+            view -> chooseRoutingPreset()
+        );
+        findViewById(R.id.rule_geo_update).setOnClickListener(
+            view -> updateGeoData(null, true)
+        );
+        findViewById(R.id.rule_geo_rollback).setOnClickListener(
+            view -> rollbackGeoData()
+        );
         findViewById(R.id.rule_custom_domains).setOnClickListener(
             view -> editCustomRoutingRules()
         );
@@ -1821,6 +1836,11 @@ public final class MainActivity extends Activity {
             setTileActive(R.id.routing_tile, routingExpanded);
             setViewsVisible(routingExpanded,
                 R.id.rule_mode,
+                R.id.rule_routing_preset,
+                R.id.rule_geo_update,
+                R.id.rule_geo_auto_update,
+                R.id.rule_geo_status,
+                R.id.rule_geo_rollback,
                 R.id.rule_bypass_ru,
                 R.id.rule_bypass_private,
                 R.id.rule_block_ads,
@@ -1848,6 +1868,21 @@ public final class MainActivity extends Activity {
         ((Switch) findViewById(R.id.rule_block_ads)).setChecked(appSettings.blockAds());
         ((Switch) findViewById(R.id.rule_block_quic)).setChecked(appSettings.blockQuic());
         ((Switch) findViewById(R.id.rule_sniffing)).setChecked(appSettings.sniffing());
+        ((Switch) findViewById(R.id.rule_geo_auto_update)).setChecked(
+            appSettings.autoUpdateGeoData()
+        );
+        String preset = appSettings.routingPreset();
+        int presetLabel = GeoDataManager.DEFAULT_RU.equals(preset)
+            ? R.string.routing_preset_default_ru
+            : GeoDataManager.WHITELIST_RU.equals(preset)
+                ? R.string.routing_preset_whitelist_ru
+                : R.string.routing_preset_standard;
+        ((TextView) findViewById(R.id.rule_routing_preset)).setText(
+            getString(R.string.routing_preset_label, getString(presetLabel))
+        );
+        ((TextView) findViewById(R.id.rule_geo_status)).setText(
+            GeoDataManager.status(this)
+        );
         String mode = appSettings.routingMode();
         int label = "global".equals(mode)
             ? R.string.routing_global
@@ -1880,6 +1915,118 @@ public final class MainActivity extends Activity {
                 settingsChanged();
             })
             .show();
+    }
+
+    private void chooseRoutingPreset() {
+        String[] labels = {
+            getString(R.string.routing_preset_standard),
+            getString(R.string.routing_preset_default_ru),
+            getString(R.string.routing_preset_whitelist_ru)
+        };
+        String[] values = {
+            GeoDataManager.STANDARD,
+            GeoDataManager.DEFAULT_RU,
+            GeoDataManager.WHITELIST_RU
+        };
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.category_routing)
+            .setItems(labels, (dialog, which) -> {
+                String selected = values[which];
+                if (GeoDataManager.STANDARD.equals(selected)
+                    || GeoDataManager.isCustomReady(this)) {
+                    applyRoutingPreset(selected);
+                    return;
+                }
+                new AlertDialog.Builder(this)
+                    .setTitle(labels[which])
+                    .setMessage(
+                        "Будут загружены внешние GeoIP/GeoSite из hydraponique. "
+                            + "SHA-256 берётся из GitHub Release, затем файлы "
+                            + "проверяются установленным Xray-core."
+                    )
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton(R.string.update_geo_data, (confirm, ignored) ->
+                        updateGeoData(selected, true))
+                    .show();
+            })
+            .show();
+    }
+
+    private void applyRoutingPreset(String preset) {
+        appSettings.setRoutingPreset(preset);
+        if (!GeoDataManager.STANDARD.equals(preset)) {
+            appSettings.setRoutingMode("global");
+        }
+        renderRules();
+        settingsChanged();
+    }
+
+    private void checkGeoDataUpdate() {
+        if (GeoDataManager.STANDARD.equals(appSettings.routingPreset())
+            || !appSettings.autoUpdateGeoData()
+            || !GeoDataManager.updateDue(this)) {
+            return;
+        }
+        updateGeoData(null, false);
+    }
+
+    private void updateGeoData(String selectAfter, boolean notify) {
+        if (!geoUpdateRunning.compareAndSet(false, true)) {
+            return;
+        }
+        TextView statusView = findViewById(R.id.rule_geo_status);
+        statusView.setText("Загрузка и проверка geo-баз…");
+        executor.execute(() -> {
+            try {
+                GeoDataManager.update(this);
+                runOnUiThread(() -> {
+                    geoUpdateRunning.set(false);
+                    if (selectAfter != null) {
+                        applyRoutingPreset(selectAfter);
+                    }
+                    renderRules();
+                    if (notify) {
+                        Toast.makeText(
+                            this,
+                            R.string.geo_update_complete,
+                            Toast.LENGTH_LONG
+                        ).show();
+                    }
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    geoUpdateRunning.set(false);
+                    renderRules();
+                    Toast.makeText(
+                        this,
+                        "Geo-базы не обновлены: " + safeMessage(error),
+                        Toast.LENGTH_LONG
+                    ).show();
+                });
+            }
+        });
+    }
+
+    private void rollbackGeoData() {
+        try {
+            GeoDataManager.rollback(this);
+            renderRules();
+            settingsChanged();
+            Toast.makeText(this, "Предыдущие geo-базы восстановлены", Toast.LENGTH_LONG).show();
+        } catch (Exception error) {
+            Toast.makeText(
+                this,
+                "Откат невозможен: " + safeMessage(error),
+                Toast.LENGTH_LONG
+            ).show();
+        }
+    }
+
+    private String safeMessage(Throwable error) {
+        String message = error.getMessage();
+        return message == null || message.trim().isEmpty()
+            ? error.getClass().getSimpleName()
+            : message;
     }
 
     private void editCustomRoutingRules() {

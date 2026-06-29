@@ -125,6 +125,22 @@ public final class AppSettings {
         preferences.edit().putString("routing_mode", value).apply();
     }
 
+    public String routingPreset() {
+        return preferences.getString("routing_preset", "standard");
+    }
+
+    public void setRoutingPreset(String value) {
+        preferences.edit().putString("routing_preset", value).apply();
+    }
+
+    public boolean autoUpdateGeoData() {
+        return preferences.getBoolean("auto_update_geo", true);
+    }
+
+    public void setAutoUpdateGeoData(boolean value) {
+        preferences.edit().putBoolean("auto_update_geo", value).apply();
+    }
+
     public boolean blockAds() {
         return preferences.getBoolean("block_ads", false);
     }

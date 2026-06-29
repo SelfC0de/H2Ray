@@ -26,6 +26,7 @@ import com.h2ray.app.data.LogStore;
 import com.h2ray.app.data.ProfileStore;
 import com.h2ray.app.network.PublicIpResolver;
 import com.h2ray.app.xray.ServerEndpoint;
+import com.h2ray.app.xray.GeoDataManager;
 import com.h2ray.app.xray.XrayBridge;
 import com.h2ray.app.xray.XrayConfigFactory;
 
@@ -184,9 +185,19 @@ public final class H2RayVpnService extends VpnService {
                     throw new IllegalStateException(getString(R.string.no_profile));
                 }
 
-                copyCoreAsset("geoip.dat");
-                copyCoreAsset("geosite.dat");
                 AppSettings settings = new AppSettings(this);
+                File dataDirectory = GeoDataManager.directory(
+                    this,
+                    settings.routingPreset()
+                );
+                if (GeoDataManager.STANDARD.equals(settings.routingPreset())) {
+                    copyCoreAsset("geoip.dat");
+                    copyCoreAsset("geosite.dat");
+                } else if (!GeoDataManager.isCustomReady(this)) {
+                    throw new IllegalStateException(
+                        "Geo-базы RU не загружены. Откройте Правила → Маршрутизация"
+                    );
+                }
                 int mtu = settings.mtu();
                 verifyServerReachable(store, settings.connectionTimeoutSeconds());
 
@@ -210,7 +221,7 @@ public final class H2RayVpnService extends VpnService {
                 String runtimeConfig = XrayConfigFactory.createRuntimeConfig(
                     store.getConfig(), settings
                 );
-                XrayBridge.start(getCoreDirectory().getAbsolutePath(), runtimeConfig);
+                XrayBridge.start(dataDirectory.getAbsolutePath(), runtimeConfig);
 
                 if (cancelStart.get()) {
                     cleanupResources();

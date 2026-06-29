@@ -234,6 +234,31 @@
             style="@style/H2RayServerButtonSecondary"
             android:text="@string/reset_panel_credentials" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/tls_master_title"
+            android:textColor="@color/accent"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/panel_tls_domain"
+            style="@style/H2RayServerInput"
+            android:hint="@string/tls_domain_hint"
+            android:inputType="textUri" />
+
+        <Button
+            android:id="@+id/configure_panel_tls"
+            style="@style/H2RayServerButton"
+            android:text="@string/configure_panel_tls" />
+
+        <Button
+            android:id="@+id/rollback_panel_tls"
+            style="@style/H2RayServerButtonSecondary"
+            android:text="@string/rollback_panel_tls" />
+
         <LinearLayout
             android:id="@+id/panel_result"
             android:layout_width="match_parent"

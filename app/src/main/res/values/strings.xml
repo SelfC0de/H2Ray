@@ -187,4 +187,17 @@
     <string name="category_diagnostics">Диагностика\nЛоги и отчёт</string>
     <string name="category_updates">Обновления\nВерсия приложения</string>
     <string name="category_security">Безопасность\nPIN и шифрование</string>
+    <string name="routing_preset_label">Пресет: %1$s</string>
+    <string name="routing_preset_standard">Стандартный</string>
+    <string name="routing_preset_default_ru">DEFAULT RU</string>
+    <string name="routing_preset_whitelist_ru">WHITELIST RU</string>
+    <string name="update_geo_data">Проверить и обновить GeoIP/GeoSite</string>
+    <string name="auto_update_geo_data">Автообновление geo-баз раз в сутки</string>
+    <string name="rollback_geo_data">Откатить geo-базы</string>
+    <string name="geo_update_complete">Geo-базы проверены Xray и обновлены</string>
+    <string name="tls_master_title">TLS-мастер 3x-ui</string>
+    <string name="tls_domain_hint">Ваш домен панели, например panel.example.com</string>
+    <string name="configure_panel_tls">Проверить DNS и настроить TLS</string>
+    <string name="rollback_panel_tls">Откатить последнюю настройку TLS</string>
+    <string name="tls_confirm">Будет проверен A-запись домена, создана резервная копия БД 3x-ui и запрошен сертификат Let’s Encrypt. Панель не удаляется, nginx и firewall не изменяются.</string>
 </resources>

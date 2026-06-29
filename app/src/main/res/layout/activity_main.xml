@@ -541,6 +541,58 @@
                 android:textSize="14sp"
                 android:visibility="gone" />
 
+            <TextView
+                android:id="@+id/rule_routing_preset"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/rule_geo_update"
+                style="@style/H2RayServerButtonSecondary"
+                android:layout_marginTop="8dp"
+                android:text="@string/update_geo_data"
+                android:visibility="gone" />
+
+            <Switch
+                android:id="@+id/rule_geo_auto_update"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/auto_update_geo_data"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/rule_geo_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_stat"
+                android:padding="12dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/rule_geo_rollback"
+                style="@style/H2RayServerButtonSecondary"
+                android:text="@string/rollback_geo_data"
+                android:visibility="gone" />
+
             <Switch
                 android:id="@+id/rule_bypass_ru"
                 android:layout_width="match_parent"

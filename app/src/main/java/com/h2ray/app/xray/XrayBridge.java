@@ -56,6 +56,13 @@ public final class XrayBridge {
         }
     }
 
+    public static void test(String dataDirectory, String configPath) throws Exception {
+        JSONObject request = new JSONObject()
+            .put("datDir", dataDirectory)
+            .put("configPath", configPath);
+        requireSuccess(LibXray.testXray(encodeJson(request)));
+    }
+
     public static void stop() throws Exception {
         requireSuccess(LibXray.stopXray());
     }

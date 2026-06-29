@@ -32,6 +32,9 @@ public final class ServerSetupActivity extends Activity {
         Pattern.compile("[A-Za-z0-9_.@-]{3,64}");
     private static final Pattern ENV_LINE =
         Pattern.compile("(?m)^([A-Z0-9_]+)=(.*)$");
+    private static final Pattern SAFE_DOMAIN = Pattern.compile(
+        "(?i)(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}"
+    );
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final ThreeXuiSshClient ssh = new ThreeXuiSshClient();
@@ -41,6 +44,7 @@ public final class ServerSetupActivity extends Activity {
     private EditText sshPasswordInput;
     private EditText panelUserInput;
     private EditText panelPasswordInput;
+    private EditText tlsDomainInput;
     private TextView status;
     private TextView panelUrl;
     private TextView panelLogin;
@@ -49,6 +53,8 @@ public final class ServerSetupActivity extends Activity {
     private Button installButton;
     private Button readButton;
     private Button resetButton;
+    private Button configureTlsButton;
+    private Button rollbackTlsButton;
     private ThreeXuiStore store;
     private volatile boolean trusted;
     private volatile boolean busy;
@@ -66,6 +72,7 @@ public final class ServerSetupActivity extends Activity {
         sshPasswordInput = findViewById(R.id.ssh_password);
         panelUserInput = findViewById(R.id.panel_username);
         panelPasswordInput = findViewById(R.id.panel_password);
+        tlsDomainInput = findViewById(R.id.panel_tls_domain);
         status = findViewById(R.id.server_setup_status);
         panelUrl = findViewById(R.id.panel_url);
         panelLogin = findViewById(R.id.panel_login);
@@ -75,6 +82,8 @@ public final class ServerSetupActivity extends Activity {
         installButton = findViewById(R.id.install_panel);
         readButton = findViewById(R.id.read_panel);
         resetButton = findViewById(R.id.reset_panel_credentials);
+        configureTlsButton = findViewById(R.id.configure_panel_tls);
+        rollbackTlsButton = findViewById(R.id.rollback_panel_tls);
 
         hostInput.setText(store.host());
         portInput.setText(String.valueOf(store.port()));
@@ -110,6 +119,8 @@ public final class ServerSetupActivity extends Activity {
         installButton.setOnClickListener(view -> confirmInstall());
         readButton.setOnClickListener(view -> readPanel());
         resetButton.setOnClickListener(view -> resetCredentials());
+        configureTlsButton.setOnClickListener(view -> confirmConfigureTls());
+        rollbackTlsButton.setOnClickListener(view -> confirmRollbackTls());
         findViewById(R.id.open_panel).setOnClickListener(view -> openPanel());
     }
 
@@ -311,6 +322,163 @@ public final class ServerSetupActivity extends Activity {
         });
     }
 
+    private void confirmConfigureTls() {
+        if (!requireTrusted()) {
+            return;
+        }
+        String domain = normalizedDomain();
+        if (domain == null) {
+            return;
+        }
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.tls_master_title)
+            .setMessage(R.string.tls_confirm)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok, (dialog, which) ->
+                configureTls(domain))
+            .show();
+    }
+
+    private void configureTls(String domain) {
+        ThreeXuiSshClient.Target target = target();
+        if (target == null || !begin("Проверка DNS и выпуск сертификата…")) {
+            return;
+        }
+        String quotedDomain = ThreeXuiSshClient.shellQuote(domain);
+        String command =
+            "set -Eeuo pipefail; DOMAIN=" + quotedDomain + "; "
+                + "test -x /usr/local/x-ui/x-ui; test -f /etc/x-ui/x-ui.db; "
+                + "SERVER_IP=$(curl -4fsS --max-time 12 https://api.ipify.org); "
+                + "getent ahostsv4 \"$DOMAIN\" | awk '{print $1}' "
+                + "| grep -Fxq \"$SERVER_IP\" || { "
+                + "echo \"A-запись домена не указывает на $SERVER_IP\"; exit 24; }; "
+                + "BACKUP=/var/backups/h2ray-3xui/$(date -u +%Y%m%dT%H%M%SZ); "
+                + "mkdir -p \"$BACKUP\"; chmod 700 /var/backups/h2ray-3xui \"$BACKUP\"; "
+                + "SETTINGS=$(/usr/local/x-ui/x-ui setting -show true 2>/dev/null || true); "
+                + "OLD_CERT=$(printf '%s\\n' \"$SETTINGS\" "
+                + "| awk -F: 'tolower($1) ~ /^[[:space:]]*cert[[:space:]]*$/ "
+                + "{sub(/^[^:]*:[[:space:]]*/,\"\"); print; exit}'); "
+                + "OLD_KEY=$(printf '%s\\n' \"$SETTINGS\" "
+                + "| awk -F: 'tolower($1) ~ /^[[:space:]]*key[[:space:]]*$/ "
+                + "{sub(/^[^:]*:[[:space:]]*/,\"\"); print; exit}'); "
+                + "if command -v sqlite3 >/dev/null 2>&1; then "
+                + "sqlite3 /etc/x-ui/x-ui.db \".backup '$BACKUP/x-ui.db'\"; "
+                + "else cp -a /etc/x-ui/x-ui.db \"$BACKUP/x-ui.db\"; fi; "
+                + "printf 'OLD_CERT_B64=%s\\nOLD_KEY_B64=%s\\nDOMAIN=%s\\n' "
+                + "\"$(printf %s \"$OLD_CERT\" | base64 | tr -d '\\n')\" "
+                + "\"$(printf %s \"$OLD_KEY\" | base64 | tr -d '\\n')\" "
+                + "\"$DOMAIN\" > \"$BACKUP/tls.env\"; "
+                + "ln -sfn \"$BACKUP\" /var/backups/h2ray-3xui/latest-tls; "
+                + "rollback(){ systemctl stop x-ui || true; "
+                + "cp -a \"$BACKUP/x-ui.db\" /etc/x-ui/x-ui.db; "
+                + "systemctl start x-ui || true; }; trap rollback ERR; "
+                + "if ss -H -ltn 'sport = :80' | grep -q .; then "
+                + "echo 'Порт 80 занят. TLS-мастер ничего не изменил.'; exit 25; fi; "
+                + "if ! command -v certbot >/dev/null 2>&1; then "
+                + "if command -v apt-get >/dev/null 2>&1; then "
+                + "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y certbot; "
+                + "elif command -v dnf >/dev/null 2>&1; then dnf install -y certbot; "
+                + "else echo 'Не удалось установить certbot'; exit 26; fi; fi; "
+                + "certbot certonly --standalone --non-interactive --agree-tos "
+                + "--register-unsafely-without-email --keep-until-expiring -d \"$DOMAIN\"; "
+                + "CERT=/etc/letsencrypt/live/$DOMAIN/fullchain.pem; "
+                + "KEY=/etc/letsencrypt/live/$DOMAIN/privkey.pem; "
+                + "test -s \"$CERT\"; test -s \"$KEY\"; "
+                + "/usr/local/x-ui/x-ui cert -webCert \"$CERT\" -webCertKey \"$KEY\"; "
+                + "install -d -m 755 /etc/letsencrypt/renewal-hooks/deploy; "
+                + "printf '#!/bin/sh\\nsystemctl restart x-ui\\n' "
+                + "> /etc/letsencrypt/renewal-hooks/deploy/h2ray-xui-restart; "
+                + "chmod 755 /etc/letsencrypt/renewal-hooks/deploy/h2ray-xui-restart; "
+                + "systemctl restart x-ui; systemctl is-active --quiet x-ui; "
+                + "trap - ERR; echo \"TLS_OK=$DOMAIN\"";
+        executor.execute(() -> {
+            try {
+                ThreeXuiSshClient.CommandResult result =
+                    ssh.execute(knownHosts(), target, command, true);
+                result.requireSuccess();
+                PanelData data = readPanelData(target);
+                data.url = replaceUrlHost(data.url, domain);
+                store.savePanel(data.url, store.panelUsername(), store.panelPassword());
+                runOnUiThread(() -> {
+                    end();
+                    showPanel(data.url, store.panelUsername(), store.panelPassword());
+                    status.setText("TLS настроен: " + domain);
+                    status.setTextColor(getColor(R.color.success));
+                });
+            } catch (Exception error) {
+                fail(error);
+            }
+        });
+    }
+
+    private void confirmRollbackTls() {
+        if (!requireTrusted()) {
+            return;
+        }
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.rollback_panel_tls)
+            .setMessage("Будут восстановлены только прежние пути сертификата панели.")
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok, (dialog, which) -> rollbackTls())
+            .show();
+    }
+
+    private void rollbackTls() {
+        ThreeXuiSshClient.Target target = target();
+        if (target == null || !begin("Откат TLS…")) {
+            return;
+        }
+        String command =
+            "set -euo pipefail; L=/var/backups/h2ray-3xui/latest-tls; "
+                + "test -r \"$L/tls.env\"; . \"$L/tls.env\"; "
+                + "OLD_CERT=$(printf %s \"$OLD_CERT_B64\" | base64 -d); "
+                + "OLD_KEY=$(printf %s \"$OLD_KEY_B64\" | base64 -d); "
+                + "/usr/local/x-ui/x-ui cert -webCert \"$OLD_CERT\" "
+                + "-webCertKey \"$OLD_KEY\"; systemctl restart x-ui; "
+                + "systemctl is-active --quiet x-ui";
+        executor.execute(() -> {
+            try {
+                ThreeXuiSshClient.CommandResult result =
+                    ssh.execute(knownHosts(), target, command, true);
+                result.requireSuccess();
+                runOnUiThread(() -> {
+                    end();
+                    status.setText("Предыдущие настройки TLS восстановлены");
+                    status.setTextColor(getColor(R.color.success));
+                });
+            } catch (Exception error) {
+                fail(error);
+            }
+        });
+    }
+
+    private String normalizedDomain() {
+        String domain = tlsDomainInput.getText().toString()
+            .trim()
+            .toLowerCase(Locale.ROOT);
+        if (!SAFE_DOMAIN.matcher(domain).matches()) {
+            tlsDomainInput.setError("Укажите корректный домен без http:// и пути");
+            return null;
+        }
+        return domain;
+    }
+
+    private String replaceUrlHost(String source, String domain) {
+        if (source == null || source.isEmpty()) {
+            return "https://" + domain + "/";
+        }
+        try {
+            Uri value = Uri.parse(source);
+            return value.buildUpon()
+                .scheme("https")
+                .encodedAuthority(domain + (value.getPort() > 0 ? ":" + value.getPort() : ""))
+                .build()
+                .toString();
+        } catch (RuntimeException error) {
+            return "https://" + domain + "/";
+        }
+    }
+
     private PanelData readPanelData(ThreeXuiSshClient.Target target) throws Exception {
         String command =
             "if [ -r /etc/x-ui/install-result.env ]; then "
@@ -454,6 +622,8 @@ public final class ServerSetupActivity extends Activity {
         installButton.setEnabled(enabled);
         readButton.setEnabled(enabled);
         resetButton.setEnabled(enabled);
+        configureTlsButton.setEnabled(enabled);
+        rollbackTlsButton.setEnabled(enabled);
     }
 
     private void showPanel(String url, String username, String password) {
