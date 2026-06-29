@@ -69,19 +69,6 @@
                     android:layout_weight="0.45" />
 
                 <TextView
-                    android:id="@+id/app_routing_button"
-                    android:layout_width="44dp"
-                    android:layout_height="40dp"
-                    android:background="?android:attr/selectableItemBackgroundBorderless"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:text="|||"
-                    android:textColor="@color/accent"
-                    android:textSize="17sp"
-                    android:textStyle="bold" />
-
-                <TextView
                     android:id="@+id/header_menu_button"
                     android:layout_width="40dp"
                     android:layout_height="40dp"
@@ -986,6 +973,19 @@
                 android:backgroundTint="@color/surface"
                 android:text="@string/update_app"
                 android:textAllCaps="false"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <Switch
+                android:id="@+id/setting_auto_check_updates"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/auto_check_updates"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
                 android:visibility="gone" />

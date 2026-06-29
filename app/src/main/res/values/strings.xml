@@ -200,4 +200,9 @@
     <string name="configure_panel_tls">Проверить DNS и настроить TLS</string>
     <string name="rollback_panel_tls">Откатить последнюю настройку TLS</string>
     <string name="tls_confirm">Будет проверен A-запись домена, создана резервная копия БД 3x-ui и запрошен сертификат Let’s Encrypt. Панель не удаляется, nginx и firewall не изменяются.</string>
+    <string name="auto_check_updates">Автопроверка обновлений</string>
+    <string name="setup_step_server">1  Сервер</string>
+    <string name="setup_step_install">2  Установка</string>
+    <string name="setup_step_tls">3  TLS</string>
+    <string name="setup_menu">Дополнительные действия</string>
 </resources>

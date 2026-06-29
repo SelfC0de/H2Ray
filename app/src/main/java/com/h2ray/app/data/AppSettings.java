@@ -141,6 +141,14 @@ public final class AppSettings {
         preferences.edit().putBoolean("auto_update_geo", value).apply();
     }
 
+    public boolean autoCheckUpdates() {
+        return preferences.getBoolean("auto_check_updates", true);
+    }
+
+    public void setAutoCheckUpdates(boolean value) {
+        preferences.edit().putBoolean("auto_check_updates", value).apply();
+    }
+
     public boolean blockAds() {
         return preferences.getBoolean("block_ads", false);
     }

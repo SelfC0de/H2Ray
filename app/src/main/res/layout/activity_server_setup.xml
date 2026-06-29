@@ -47,9 +47,33 @@
                 android:textColor="@color/text_primary"
                 android:textSize="19sp"
                 android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/server_setup_menu"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:contentDescription="@string/setup_menu"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="•••"
+                android:textColor="@color/text_secondary"
+                android:textSize="16sp" />
         </LinearLayout>
 
         <TextView
+            android:id="@+id/setup_steps"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:background="@drawable/bg_stat"
+            android:gravity="center"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/ssh_section_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
@@ -77,6 +101,7 @@
             android:inputType="textUri" />
 
         <LinearLayout
+            android:id="@+id/ssh_account_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
@@ -102,6 +127,7 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/ssh_password_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
@@ -151,6 +177,7 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/panel_admin_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="22dp"
@@ -160,6 +187,7 @@
             android:textStyle="bold" />
 
         <LinearLayout
+            android:id="@+id/panel_username_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
@@ -180,6 +208,7 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/panel_password_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
@@ -227,14 +256,17 @@
         <Button
             android:id="@+id/read_panel"
             style="@style/H2RayServerButtonSecondary"
-            android:text="@string/read_panel_data" />
+            android:text="@string/read_panel_data"
+            android:visibility="gone" />
 
         <Button
             android:id="@+id/reset_panel_credentials"
             style="@style/H2RayServerButtonSecondary"
-            android:text="@string/reset_panel_credentials" />
+            android:text="@string/reset_panel_credentials"
+            android:visibility="gone" />
 
         <TextView
+            android:id="@+id/tls_section_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
@@ -257,7 +289,8 @@
         <Button
             android:id="@+id/rollback_panel_tls"
             style="@style/H2RayServerButtonSecondary"
-            android:text="@string/rollback_panel_tls" />
+            android:text="@string/rollback_panel_tls"
+            android:visibility="gone" />
 
         <LinearLayout
             android:id="@+id/panel_result"

@@ -9,6 +9,12 @@ public final class ThreeXuiStore {
 
     public ThreeXuiStore(Context context) {
         preferences = context.getSharedPreferences("h2ray_3xui", Context.MODE_PRIVATE);
+        if (!preferences.contains("panel_server_host")
+            && !preferences.getString("panel_url", "").isEmpty()) {
+            preferences.edit()
+                .putString("panel_server_host", preferences.getString("host", ""))
+                .apply();
+        }
     }
 
     public void saveServer(String host, int port, String username) {
@@ -34,6 +40,7 @@ public final class ThreeXuiStore {
     public void savePanel(String url, String username, String password) {
         preferences.edit()
             .putString("panel_url", url)
+            .putString("panel_server_host", host())
             .putString("panel_username", secureStorage.encrypt(username))
             .putString("panel_password", secureStorage.encrypt(password))
             .apply();
@@ -49,5 +56,9 @@ public final class ThreeXuiStore {
 
     public String panelPassword() {
         return secureStorage.decrypt(preferences.getString("panel_password", ""));
+    }
+
+    public String panelServerHost() {
+        return preferences.getString("panel_server_host", "");
     }
 }

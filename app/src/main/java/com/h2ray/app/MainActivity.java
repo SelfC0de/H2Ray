@@ -211,9 +211,6 @@ public final class MainActivity extends Activity {
         findViewById(R.id.three_xui_button).setOnClickListener(
             view -> startActivity(new Intent(this, ServerSetupActivity.class))
         );
-        findViewById(R.id.app_routing_button).setOnClickListener(
-            view -> AppRoutingDialog.show(this)
-        );
         findViewById(R.id.nav_home).setOnClickListener(view -> showScreen("home"));
         findViewById(R.id.nav_profiles).setOnClickListener(view -> showScreen("profiles"));
         findViewById(R.id.nav_rules).setOnClickListener(view -> showScreen("rules"));
@@ -282,7 +279,9 @@ public final class MainActivity extends Activity {
         if (updateDownloadManager.state().complete()) {
             handler.postDelayed(this::prepareUpdateInstallation, 600);
         }
-        checkForUpdates(false);
+        if (appSettings.autoCheckUpdates()) {
+            checkForUpdates(false);
+        }
         updateSubscriptions(false);
         checkGeoDataUpdate();
         startHomeAnimations();
@@ -1530,6 +1529,7 @@ public final class MainActivity extends Activity {
         Switch happyEyeballs = findViewById(R.id.setting_happy_eyeballs);
         Switch autoReconnect = findViewById(R.id.setting_auto_reconnect);
         Switch restoreBoot = findViewById(R.id.setting_restore_boot);
+        Switch autoCheckUpdates = findViewById(R.id.setting_auto_check_updates);
         Switch appLock = findViewById(R.id.setting_app_lock);
         ipv6.setOnCheckedChangeListener((button, value) -> {
             appSettings.setIpv6(value);
@@ -1552,6 +1552,12 @@ public final class MainActivity extends Activity {
             appSettings.setAutoReconnect(value));
         restoreBoot.setOnCheckedChangeListener((button, value) ->
             appSettings.setRestoreAfterBoot(value));
+        autoCheckUpdates.setOnCheckedChangeListener((button, value) -> {
+            appSettings.setAutoCheckUpdates(value);
+            if (value) {
+                checkForUpdates(false);
+            }
+        });
         appLock.setOnCheckedChangeListener((button, value) -> {
             if (value == appSettings.appLock()) {
                 return;
@@ -1615,6 +1621,9 @@ public final class MainActivity extends Activity {
         );
         ((Switch) findViewById(R.id.setting_restore_boot)).setChecked(
             appSettings.restoreAfterBoot()
+        );
+        ((Switch) findViewById(R.id.setting_auto_check_updates)).setChecked(
+            appSettings.autoCheckUpdates()
         );
         ((Switch) findViewById(R.id.setting_app_lock)).setChecked(appSettings.appLock());
         ((TextView) findViewById(R.id.setting_dns)).setText(
@@ -1697,7 +1706,11 @@ public final class MainActivity extends Activity {
         }
         updatesExpanded = !updatesExpanded;
         setTileActive(R.id.updates_tile, updatesExpanded);
-        setViewsVisible(updatesExpanded, R.id.update_app);
+        setViewsVisible(
+            updatesExpanded,
+            R.id.update_app,
+            R.id.setting_auto_check_updates
+        );
         ((TextView) findViewById(R.id.updates_header)).setText(
             updatesExpanded ? R.string.updates_expanded : R.string.updates_collapsed
         );

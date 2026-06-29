@@ -13,6 +13,7 @@ import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -116,12 +117,14 @@ public final class ServerSetupActivity extends Activity {
             view -> togglePassword(panelPasswordInput, panelPasswordToggle)
         );
         testButton.setOnClickListener(view -> inspectHost());
-        installButton.setOnClickListener(view -> confirmInstall());
+        installButton.setOnClickListener(view -> handlePanelPrimaryAction());
         readButton.setOnClickListener(view -> readPanel());
         resetButton.setOnClickListener(view -> resetCredentials());
         configureTlsButton.setOnClickListener(view -> confirmConfigureTls());
         rollbackTlsButton.setOnClickListener(view -> confirmRollbackTls());
+        findViewById(R.id.server_setup_menu).setOnClickListener(this::showSetupMenu);
         findViewById(R.id.open_panel).setOnClickListener(view -> openPanel());
+        showSetupStage(store.panelUrl().isEmpty() ? 1 : 3);
     }
 
     @Override
@@ -185,6 +188,7 @@ public final class ServerSetupActivity extends Activity {
                     end();
                     status.setText(getString(R.string.ssh_verified) + "\n" + result.output.trim());
                     status.setTextColor(getColor(R.color.success));
+                    showSetupStage(2);
                 });
             } catch (Exception error) {
                 trusted = false;
@@ -211,6 +215,14 @@ public final class ServerSetupActivity extends Activity {
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton("Установить", (dialog, which) -> installPanel())
             .show();
+    }
+
+    private void handlePanelPrimaryAction() {
+        if (!panelKnownForCurrentServer()) {
+            confirmInstall();
+        } else {
+            resetCredentials();
+        }
     }
 
     private void installPanel() {
@@ -249,6 +261,7 @@ public final class ServerSetupActivity extends Activity {
                     showPanel(finalData.url, finalData.username, finalData.password);
                     status.setText("3x-ui установлен и запущен");
                     status.setTextColor(getColor(R.color.success));
+                    showSetupStage(3);
                 });
             } catch (Exception error) {
                 fail(error);
@@ -282,6 +295,7 @@ public final class ServerSetupActivity extends Activity {
                     showPanel(finalData.url, finalData.username, finalData.password);
                     status.setText("Настройки 3x-ui получены");
                     status.setTextColor(getColor(R.color.success));
+                    showSetupStage(3);
                 });
             } catch (Exception error) {
                 fail(error);
@@ -315,6 +329,7 @@ public final class ServerSetupActivity extends Activity {
                     showPanel(data.url, username, password);
                     status.setText("Username и password обновлены");
                     status.setTextColor(getColor(R.color.success));
+                    showSetupStage(3);
                 });
             } catch (Exception error) {
                 fail(error);
@@ -476,6 +491,79 @@ public final class ServerSetupActivity extends Activity {
                 .toString();
         } catch (RuntimeException error) {
             return "https://" + domain + "/";
+        }
+    }
+
+    private void showSetupMenu(View anchor) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        menu.getMenu().add(0, 1, 0, "Изменить SSH-сервер");
+        menu.getMenu().add(0, 2, 1, getString(R.string.read_panel_data));
+        menu.getMenu().add(0, 3, 2, "Изменить данные администратора");
+        menu.getMenu().add(0, 4, 3, getString(R.string.rollback_panel_tls));
+        menu.setOnMenuItemClickListener(item -> {
+            switch (item.getItemId()) {
+                case 1:
+                    trusted = false;
+                    showSetupStage(1);
+                    return true;
+                case 2:
+                    readPanel();
+                    return true;
+                case 3:
+                    showSetupStage(2);
+                    return true;
+                case 4:
+                    confirmRollbackTls();
+                    return true;
+                default:
+                    return false;
+            }
+        });
+        menu.show();
+    }
+
+    private void showSetupStage(int stage) {
+        TextView steps = findViewById(R.id.setup_steps);
+        steps.setText(
+            (stage == 1 ? "● " : "✓ ") + getString(R.string.setup_step_server)
+                + "    " + (stage == 2 ? "● " : stage > 2 ? "✓ " : "○ ")
+                + getString(R.string.setup_step_install)
+                + "    " + (stage == 3 ? "● " : "○ ")
+                + getString(R.string.setup_step_tls)
+        );
+        boolean server = stage == 1;
+        boolean admin = stage == 2;
+        boolean ready = stage == 3;
+        setVisible(server,
+            R.id.ssh_section_title,
+            R.id.ssh_host,
+            R.id.ssh_account_row,
+            R.id.ssh_password_row);
+        setVisible(admin,
+            R.id.panel_admin_title,
+            R.id.panel_username_row,
+            R.id.panel_password_row,
+            R.id.install_panel);
+        setVisible(ready,
+            R.id.panel_result,
+            R.id.tls_section_title,
+            R.id.panel_tls_domain,
+            R.id.configure_panel_tls);
+        installButton.setText(
+            !panelKnownForCurrentServer()
+                ? R.string.install_three_xui
+                : R.string.reset_panel_credentials
+        );
+    }
+
+    private boolean panelKnownForCurrentServer() {
+        return !store.panelUrl().isEmpty()
+            && store.panelServerHost().equals(hostInput.getText().toString().trim());
+    }
+
+    private void setVisible(boolean visible, int... ids) {
+        for (int id : ids) {
+            findViewById(id).setVisibility(visible ? View.VISIBLE : View.GONE);
         }
     }
 
