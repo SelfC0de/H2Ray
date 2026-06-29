@@ -62,9 +62,8 @@ public final class AppRoutingDialog {
                     boolean system = (app.flags & ApplicationInfo.FLAG_SYSTEM) != 0
                         || (app.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0;
                     if (!system
-                        && app.enabled
                         && !activity.getPackageName().equals(app.packageName)
-                        && manager.getLaunchIntentForPackage(app.packageName) != null) {
+                        && (app.flags & ApplicationInfo.FLAG_INSTALLED) != 0) {
                         apps.add(app);
                     }
                 }
