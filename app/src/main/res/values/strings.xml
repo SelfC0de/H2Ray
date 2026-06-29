@@ -185,7 +185,10 @@
     <string name="category_apps">Приложения\nВыбор трафика</string>
     <string name="category_connection">Подключение\nDNS и надёжность</string>
     <string name="category_diagnostics">Диагностика\nЛоги и отчёт</string>
-    <string name="category_updates">Обновления\nВерсия приложения</string>
+    <string name="category_updates">Обновление\nприложения</string>
+    <string name="notification_delivery_ready">Уведомления об обновлениях: разрешены</string>
+    <string name="notification_delivery_blocked">Уведомления заблокированы · открыть настройки</string>
+    <string name="developer_site">Открыть сайт SelfCode</string>
     <string name="category_security">Безопасность\nPIN и шифрование</string>
     <string name="routing_preset_label">Пресет: %1$s</string>
     <string name="routing_preset_standard">Стандартный</string>

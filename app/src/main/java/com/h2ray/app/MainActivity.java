@@ -288,8 +288,8 @@ public final class MainActivity extends Activity {
         configureRules();
         configureNavigationLabels();
         applySystemBarInsets();
-        requestNotificationPermissionIfNeeded();
         createUpdateNotificationChannel();
+        requestNotificationPermissionIfNeeded();
         registerDownloadReceiver();
         render();
         renderUpdateDownload(updateDownloadManager.state());
@@ -319,6 +319,7 @@ public final class MainActivity extends Activity {
         if (homeScreen.getVisibility() == View.VISIBLE) {
             startHomeAnimations();
         }
+        renderSettings();
         if (waitingForInstallPermission
             && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
             && getPackageManager().canRequestPackageInstalls()) {
@@ -556,6 +557,7 @@ public final class MainActivity extends Activity {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
+            renderSettings();
             if (grantResults.length > 0
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED
                 && latestUpdate != null
@@ -828,8 +830,11 @@ public final class MainActivity extends Activity {
                 if (result.updateAvailable) {
                     showUpdateNotification(result);
                 } else if (!result.failed) {
-                    getSystemService(NotificationManager.class)
-                        .cancel(UPDATE_NOTIFICATION_ID);
+                    NotificationManager manager =
+                        getSystemService(NotificationManager.class);
+                    if (manager != null) {
+                        manager.cancel(UPDATE_NOTIFICATION_ID);
+                    }
                 }
                 if (!userInitiated) {
                     return;
@@ -857,13 +862,14 @@ public final class MainActivity extends Activity {
             NotificationManager.IMPORTANCE_DEFAULT
         );
         channel.setDescription("Уведомления о новых обязательных версиях H2Ray");
-        getSystemService(NotificationManager.class).createNotificationChannel(channel);
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager != null) {
+            manager.createNotificationChannel(channel);
+        }
     }
 
     private void showUpdateNotification(UpdateChecker.Result update) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-            && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) {
+        if (!canDeliverUpdateNotification()) {
             return;
         }
         android.content.SharedPreferences notifications = getSharedPreferences(
@@ -892,13 +898,68 @@ public final class MainActivity extends Activity {
             .setContentIntent(openApp)
             .setAutoCancel(true)
             .setOnlyAlertOnce(true);
-        getSystemService(NotificationManager.class).notify(
-            UPDATE_NOTIFICATION_ID,
-            builder.build()
-        );
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager == null) {
+            return;
+        }
+        try {
+            manager.notify(UPDATE_NOTIFICATION_ID, builder.build());
+        } catch (RuntimeException error) {
+            return;
+        }
         notifications.edit()
             .putString("notified_version", update.latestVersion)
             .apply();
+    }
+
+    private boolean canDeliverUpdateNotification() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+            && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            return false;
+        }
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager == null || !manager.areNotificationsEnabled()) {
+            return false;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel =
+                manager.getNotificationChannel(UPDATE_NOTIFICATION_CHANNEL);
+            return channel != null
+                && channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
+        }
+        return true;
+    }
+
+    private void openUpdateNotificationSettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+            && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                new String[] {Manifest.permission.POST_NOTIFICATIONS},
+                NOTIFICATION_PERMISSION_REQUEST
+            );
+            return;
+        }
+        Intent settingsIntent;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            settingsIntent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())
+                .putExtra(Settings.EXTRA_CHANNEL_ID, UPDATE_NOTIFICATION_CHANNEL);
+        } else {
+            settingsIntent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+        }
+        try {
+            startActivity(settingsIntent);
+        } catch (RuntimeException error) {
+            startActivity(
+                new Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + getPackageName())
+                )
+            );
+        }
     }
 
     private void openAvailableUpdate() {
@@ -1657,8 +1718,11 @@ public final class MainActivity extends Activity {
                 lastAutomaticUpdateCheckAt = 0;
                 checkForUpdates(false);
             } else {
-                getSystemService(NotificationManager.class)
-                    .cancel(UPDATE_NOTIFICATION_ID);
+                NotificationManager manager =
+                    getSystemService(NotificationManager.class);
+                if (manager != null) {
+                    manager.cancel(UPDATE_NOTIFICATION_ID);
+                }
             }
         });
         appLock.setOnCheckedChangeListener((button, value) -> {
@@ -1701,6 +1765,19 @@ public final class MainActivity extends Activity {
         findViewById(R.id.updates_tile).setOnClickListener(
             view -> toggleUpdates()
         );
+        findViewById(R.id.update_notification_status).setOnClickListener(
+            view -> openUpdateNotificationSettings()
+        );
+        findViewById(R.id.open_developer_site).setOnClickListener(view -> {
+            try {
+                startActivity(new Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse("https://selfc0de.github.io/")
+                ));
+            } catch (RuntimeException error) {
+                Toast.makeText(this, R.string.update_open_failed, Toast.LENGTH_SHORT).show();
+            }
+        });
         findViewById(R.id.security_header).setOnClickListener(
             view -> toggleSecurity()
         );
@@ -1729,6 +1806,15 @@ public final class MainActivity extends Activity {
             appSettings.autoCheckUpdates()
         );
         ((Switch) findViewById(R.id.setting_app_lock)).setChecked(appSettings.appLock());
+        TextView notificationStatus = findViewById(R.id.update_notification_status);
+        notificationStatus.setText(
+            canDeliverUpdateNotification()
+                ? R.string.notification_delivery_ready
+                : R.string.notification_delivery_blocked
+        );
+        notificationStatus.setTextColor(getColor(
+            canDeliverUpdateNotification() ? R.color.success : R.color.update_border
+        ));
         ((TextView) findViewById(R.id.setting_dns)).setText(
             getString(R.string.dns_label, appSettings.xrayDns())
         );
@@ -1812,7 +1898,9 @@ public final class MainActivity extends Activity {
         setViewsVisible(
             updatesExpanded,
             R.id.update_app,
-            R.id.setting_auto_check_updates
+            R.id.setting_auto_check_updates,
+            R.id.update_notification_status,
+            R.id.open_developer_site
         );
         ((TextView) findViewById(R.id.updates_header)).setText(
             updatesExpanded ? R.string.updates_expanded : R.string.updates_collapsed
