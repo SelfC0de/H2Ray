@@ -8,6 +8,10 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.app.KeyguardManager;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -89,6 +93,9 @@ public final class MainActivity extends Activity {
     private static final int FILE_EXPORT_REQUEST = 104;
     private static final int APP_UNLOCK_REQUEST = 105;
     private static final int MAX_IMPORT_BYTES = 2 * 1024 * 1024;
+    private static final String UPDATE_NOTIFICATION_CHANNEL = "h2ray_updates";
+    private static final int UPDATE_NOTIFICATION_ID = 1002;
+    private static final long UPDATE_CHECK_INTERVAL_MS = 30L * 60L * 1000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -119,6 +126,7 @@ public final class MainActivity extends Activity {
     private volatile UpdateChecker.Result latestUpdate;
     private volatile long lastDirectIpAttempt;
     private volatile long lastProxyIpAttempt;
+    private volatile long lastAutomaticUpdateCheckAt;
     private boolean waitingForInstallPermission;
     private boolean installerLaunched;
     private boolean profilesExpanded;
@@ -167,6 +175,16 @@ public final class MainActivity extends Activity {
             }
             renderUpdateDownload(updateDownloadManager.state());
             handler.postDelayed(this, 1000);
+        }
+    };
+
+    private final Runnable automaticUpdateChecker = new Runnable() {
+        @Override
+        public void run() {
+            if (appSettings != null && appSettings.autoCheckUpdates()) {
+                checkForUpdates(false);
+            }
+            handler.postDelayed(this, UPDATE_CHECK_INTERVAL_MS);
         }
     };
 
@@ -271,6 +289,7 @@ public final class MainActivity extends Activity {
         configureNavigationLabels();
         applySystemBarInsets();
         requestNotificationPermissionIfNeeded();
+        createUpdateNotificationChannel();
         registerDownloadReceiver();
         render();
         renderUpdateDownload(updateDownloadManager.state());
@@ -295,6 +314,8 @@ public final class MainActivity extends Activity {
         }
         requestAppUnlockIfNeeded();
         handler.post(stateUpdater);
+        handler.removeCallbacks(automaticUpdateChecker);
+        handler.post(automaticUpdateChecker);
         if (homeScreen.getVisibility() == View.VISIBLE) {
             startHomeAnimations();
         }
@@ -312,6 +333,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onPause() {
         handler.removeCallbacks(stateUpdater);
+        handler.removeCallbacks(automaticUpdateChecker);
         lastPausedAt = SystemClock.elapsedRealtime();
         stopHomeAnimations();
         super.onPause();
@@ -533,6 +555,15 @@ public final class MainActivity extends Activity {
         int[] grantResults
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
+            if (grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED
+                && latestUpdate != null
+                && latestUpdate.updateAvailable) {
+                showUpdateNotification(latestUpdate);
+            }
+            return;
+        }
         if (requestCode != CAMERA_PERMISSION_REQUEST) {
             return;
         }
@@ -777,6 +808,14 @@ public final class MainActivity extends Activity {
         if (!updateCheckRunning.compareAndSet(false, true)) {
             return;
         }
+        if (!userInitiated) {
+            long now = SystemClock.elapsedRealtime();
+            if (now - lastAutomaticUpdateCheckAt < UPDATE_CHECK_INTERVAL_MS) {
+                updateCheckRunning.set(false);
+                return;
+            }
+            lastAutomaticUpdateCheckAt = now;
+        }
         if (userInitiated) {
             Toast.makeText(this, R.string.checking_update, Toast.LENGTH_SHORT).show();
         }
@@ -786,6 +825,12 @@ public final class MainActivity extends Activity {
             updateCheckRunning.set(false);
             runOnUiThread(() -> {
                 updateBadge.setVisibility(result.updateAvailable ? View.VISIBLE : View.GONE);
+                if (result.updateAvailable) {
+                    showUpdateNotification(result);
+                } else if (!result.failed) {
+                    getSystemService(NotificationManager.class)
+                        .cancel(UPDATE_NOTIFICATION_ID);
+                }
                 if (!userInitiated) {
                     return;
                 }
@@ -800,6 +845,60 @@ public final class MainActivity extends Activity {
                 }
             });
         });
+    }
+
+    private void createUpdateNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return;
+        }
+        NotificationChannel channel = new NotificationChannel(
+            UPDATE_NOTIFICATION_CHANNEL,
+            "Обновления H2Ray",
+            NotificationManager.IMPORTANCE_DEFAULT
+        );
+        channel.setDescription("Уведомления о новых обязательных версиях H2Ray");
+        getSystemService(NotificationManager.class).createNotificationChannel(channel);
+    }
+
+    private void showUpdateNotification(UpdateChecker.Result update) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+            && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        android.content.SharedPreferences notifications = getSharedPreferences(
+            "h2ray_update_notifications",
+            MODE_PRIVATE
+        );
+        if (update.latestVersion.equals(
+            notifications.getString("notified_version", "")
+        )) {
+            return;
+        }
+        PendingIntent openApp = PendingIntent.getActivity(
+            this,
+            20,
+            new Intent(this, MainActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+            ? new Notification.Builder(this, UPDATE_NOTIFICATION_CHANNEL)
+            : new Notification.Builder(this);
+        builder
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Доступно обновление H2Ray")
+            .setContentText("Версия " + update.latestVersion + " готова к установке")
+            .setContentIntent(openApp)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true);
+        getSystemService(NotificationManager.class).notify(
+            UPDATE_NOTIFICATION_ID,
+            builder.build()
+        );
+        notifications.edit()
+            .putString("notified_version", update.latestVersion)
+            .apply();
     }
 
     private void openAvailableUpdate() {
@@ -1555,7 +1654,11 @@ public final class MainActivity extends Activity {
         autoCheckUpdates.setOnCheckedChangeListener((button, value) -> {
             appSettings.setAutoCheckUpdates(value);
             if (value) {
+                lastAutomaticUpdateCheckAt = 0;
                 checkForUpdates(false);
+            } else {
+                getSystemService(NotificationManager.class)
+                    .cancel(UPDATE_NOTIFICATION_ID);
             }
         });
         appLock.setOnCheckedChangeListener((button, value) -> {
