@@ -488,19 +488,24 @@ public final class MainActivity extends Activity {
     }
 
     private void showProfilesMenu() {
-        new AlertDialog.Builder(this)
-            .setTitle(R.string.profiles_menu)
-            .setItems(new String[] {
+        ActionMenuDialog.show(
+            this,
+            getString(R.string.profiles_menu),
+            new String[] {
                 getString(R.string.import_file),
-                getString(R.string.scan_qr)
-            }, (dialog, which) -> {
+                getString(R.string.scan_qr),
+                getString(R.string.add_profile_url)
+            },
+            which -> {
                 if (which == 0) {
                     openConfigFile();
-                } else {
+                } else if (which == 1) {
                     scanQrCode();
+                } else {
+                    showImportDialog();
                 }
-            })
-            .show();
+            }
+        );
     }
 
     private void openConfigFile() {
@@ -685,24 +690,68 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        new AlertDialog.Builder(this)
-            .setTitle(profileStore.getName())
-            .setItems(new String[] {
+        ActionMenuDialog.show(
+            this,
+            profileStore.getName(),
+            new String[] {
                 getString(R.string.replace_profile),
-                getString(R.string.delete_profile)
-            }, (dialog, which) -> {
+                getString(R.string.delete_profile),
+                getString(R.string.add_profile_url)
+            },
+            which -> {
                 if (which == 0) {
-                    showImportDialog();
-                } else {
+                    showSavedProfilePicker();
+                } else if (which == 1) {
                     if (H2RayVpnService.isRunning()) {
                         startService(H2RayVpnService.stopIntent(this));
                     }
                     profileStore.clear();
                     reconcileEmptyProfileState();
                     render();
+                } else {
+                    showImportDialog();
                 }
-            })
-            .show();
+            }
+        );
+    }
+
+    private void showSavedProfilePicker() {
+        List<ProfileStore.Profile> profiles = profileStore.getProfiles();
+        if (profiles.isEmpty()) {
+            showImportDialog();
+            return;
+        }
+        ProfileStore.Profile active = profileStore.getActiveProfile();
+        String[] labels = new String[profiles.size()];
+        for (int index = 0; index < profiles.size(); index++) {
+            ProfileStore.Profile profile = profiles.get(index);
+            ServerEndpoint endpoint = ServerEndpoint.fromConfig(profile.config);
+            String server = endpoint == null
+                ? profile.protocol
+                : endpoint.displayName();
+            boolean selected = active != null && active.id.equals(profile.id);
+            labels[index] = (selected ? "●  " : "○  ")
+                + profile.name + "\n     " + profile.protocol + " · " + server;
+        }
+        ActionMenuDialog.show(
+            this,
+            getString(R.string.replace_profile),
+            labels,
+            which -> {
+                ProfileStore.Profile selected = profiles.get(which);
+                if (active != null && active.id.equals(selected.id)) {
+                    return;
+                }
+                profileStore.select(selected.id);
+                if (H2RayVpnService.isRunning()) {
+                    startService(H2RayVpnService.restartIntent(this));
+                } else {
+                    connectionStatusStore.setStopped();
+                }
+                render();
+                renderProfiles();
+            }
+        );
     }
 
     private void showAppMenu() {
@@ -712,9 +761,11 @@ public final class MainActivity extends Activity {
             getString(R.string.menu_logs),
             getString(R.string.menu_about)
         };
-        new AlertDialog.Builder(this)
-            .setTitle(R.string.app_name)
-            .setItems(actions, (dialog, which) -> {
+        ActionMenuDialog.show(
+            this,
+            getString(R.string.app_name),
+            actions,
+            which -> {
                 if (which == 0) {
                     reconnect();
                 } else if (which == 1) {
@@ -724,8 +775,8 @@ public final class MainActivity extends Activity {
                 } else {
                     showAboutDialog();
                 }
-            })
-            .show();
+            }
+        );
     }
 
     private void showAboutDialog() {
@@ -1395,9 +1446,11 @@ public final class MainActivity extends Activity {
             getString(R.string.export_profile_qr),
             getString(R.string.delete_profile)
         };
-        new AlertDialog.Builder(this)
-            .setTitle(profile.name)
-            .setItems(actions, (dialog, which) -> {
+        ActionMenuDialog.show(
+            this,
+            profile.name,
+            actions,
+            which -> {
                 if (which == 0) {
                     showEditProfileDialog(profile);
                 } else if (which == 1) {
@@ -1410,8 +1463,8 @@ public final class MainActivity extends Activity {
                 } else {
                     confirmDeleteProfile(profile);
                 }
-            })
-            .show();
+            }
+        );
     }
 
     private void showEditProfileDialog(ProfileStore.Profile profile) {

@@ -39,7 +39,8 @@
     <string name="no_profile">Профиль не выбран</string>
     <string name="import_required">Импортируйте конфигурацию</string>
     <string name="import_profile">Импорт профиля</string>
-    <string name="replace_profile">Заменить профиль</string>
+    <string name="replace_profile">Выбрать профиль</string>
+    <string name="add_profile_url">Добавить профиль по URL</string>
     <string name="delete_profile">Удалить профиль</string>
     <string name="import_action">Импортировать</string>
     <string name="import_hint">vless://, vmess://, trojan://, ss:// или Xray JSON</string>

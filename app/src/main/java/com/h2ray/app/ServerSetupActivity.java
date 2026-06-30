@@ -13,7 +13,6 @@ import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
-import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -495,31 +494,35 @@ public final class ServerSetupActivity extends Activity {
     }
 
     private void showSetupMenu(View anchor) {
-        PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenu().add(0, 1, 0, "Изменить SSH-сервер");
-        menu.getMenu().add(0, 2, 1, getString(R.string.read_panel_data));
-        menu.getMenu().add(0, 3, 2, "Изменить данные администратора");
-        menu.getMenu().add(0, 4, 3, getString(R.string.rollback_panel_tls));
-        menu.setOnMenuItemClickListener(item -> {
-            switch (item.getItemId()) {
-                case 1:
+        ActionMenuDialog.show(
+            this,
+            getString(R.string.setup_menu),
+            new String[] {
+                "Изменить SSH-сервер",
+                getString(R.string.read_panel_data),
+                "Изменить данные администратора",
+                getString(R.string.rollback_panel_tls)
+            },
+            which -> {
+                switch (which) {
+                case 0:
                     trusted = false;
                     showSetupStage(1);
-                    return true;
-                case 2:
+                    break;
+                case 1:
                     readPanel();
-                    return true;
-                case 3:
+                    break;
+                case 2:
                     showSetupStage(2);
-                    return true;
-                case 4:
+                    break;
+                case 3:
                     confirmRollbackTls();
-                    return true;
+                    break;
                 default:
-                    return false;
+                    break;
+                }
             }
-        });
-        menu.show();
+        );
     }
 
     private void showSetupStage(int stage) {
