@@ -61,7 +61,6 @@ public final class ProfileImporter {
                     "В JSON отсутствует клиентский outbound VLESS/VMess/Trojan/Shadowsocks"
                 );
             }
-            root.put("outbounds", new JSONArray().put(proxy));
         } else if (isProxyProtocol(root.optString("protocol"))) {
             JSONObject settings = root.optJSONObject("settings");
             if (root.has("listen") || (settings != null && settings.has("clients"))) {
@@ -81,9 +80,12 @@ public final class ProfileImporter {
             );
         }
         String protocol = proxy.optString("protocol", "Xray").toUpperCase(Locale.ROOT);
-        String name = fallbackName == null || fallbackName.trim().isEmpty()
-            ? protocol + " JSON"
-            : fallbackName.trim();
+        String remarks = root.optString("remarks", "").trim();
+        String name = !remarks.isEmpty()
+            ? remarks
+            : fallbackName == null || fallbackName.trim().isEmpty()
+                ? protocol + " JSON"
+                : fallbackName.trim();
         return new ProfileData(name, protocol, root.toString(), source);
     }
 

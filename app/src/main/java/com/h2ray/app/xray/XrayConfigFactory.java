@@ -20,19 +20,48 @@ public final class XrayConfigFactory {
             throw new JSONException("В конфигурации отсутствуют outbounds");
         }
 
-        JSONObject proxy = outbounds.getJSONObject(0);
-        proxy.remove("sendThrough");
-        proxy.put("tag", "proxy");
-        normalizeStreamSettings(proxy);
-        applySocketPolicy(proxy, settings);
-
-        JSONArray runtimeOutbounds = new JSONArray().put(proxy);
-        runtimeOutbounds.put(new JSONObject()
-            .put("tag", "direct")
-            .put("protocol", "freedom"));
-        runtimeOutbounds.put(new JSONObject()
-            .put("tag", "block")
-            .put("protocol", "blackhole"));
+        JSONArray runtimeOutbounds = new JSONArray();
+        String proxyTag = "";
+        for (int index = 0; index < outbounds.length(); index++) {
+            JSONObject outbound = outbounds.optJSONObject(index);
+            if (outbound == null) {
+                continue;
+            }
+            String protocol = outbound.optString("protocol", "").toLowerCase(Locale.ROOT);
+            if (!isRuntimeProtocol(protocol)) {
+                continue;
+            }
+            if (isProxyProtocol(protocol)) {
+                if (proxyTag.isEmpty()) {
+                    proxyTag = ensureTag(outbound, "proxy");
+                } else {
+                    ensureTag(outbound, "proxy-" + (index + 1));
+                }
+                outbound.remove("sendThrough");
+                normalizeStreamSettings(outbound);
+                applySocketPolicy(outbound, settings);
+            } else if ("freedom".equals(protocol)) {
+                ensureTag(outbound, "direct");
+            } else if ("blackhole".equals(protocol)) {
+                ensureTag(outbound, "block");
+            }
+            runtimeOutbounds.put(outbound);
+        }
+        if (proxyTag.isEmpty()) {
+            throw new JSONException(
+                "В конфигурации отсутствует поддерживаемый outbound VLESS/VMess/Trojan/Shadowsocks"
+            );
+        }
+        if (!hasOutboundTag(runtimeOutbounds, "direct")) {
+            runtimeOutbounds.put(new JSONObject()
+                .put("tag", "direct")
+                .put("protocol", "freedom"));
+        }
+        if (!hasOutboundTag(runtimeOutbounds, "block")) {
+            runtimeOutbounds.put(new JSONObject()
+                .put("tag", "block")
+                .put("protocol", "blackhole"));
+        }
 
         JSONArray privateNetworks = new JSONArray()
             .put("0.0.0.0/8")
@@ -76,6 +105,7 @@ public final class XrayConfigFactory {
             .put("destOverride", sniffers));
 
         config.put("log", new JSONObject().put("loglevel", "warning"));
+        config.remove("remarks");
         JSONArray dnsServers = new JSONArray();
         if (settings.fakeDns()) {
             dnsServers.put("fakedns");
@@ -92,6 +122,10 @@ public final class XrayConfigFactory {
             .put("servers", dnsServers));
         config.put("inbounds", new JSONArray().put(tunInbound));
         config.put("outbounds", runtimeOutbounds);
+        JSONObject importedRouting = config.optJSONObject("routing");
+        JSONArray importedRules = importedRouting == null
+            ? null
+            : importedRouting.optJSONArray("rules");
         JSONArray rules = new JSONArray();
         String preset = settings.routingPreset();
         boolean customRuPreset = GeoDataManager.DEFAULT_RU.equals(preset)
@@ -102,6 +136,14 @@ public final class XrayConfigFactory {
                 .put("type", "field")
                 .put("ip", new JSONArray().put("::/0"))
                 .put("outboundTag", "block"));
+        }
+        if (importedRules != null) {
+            for (int index = 0; index < importedRules.length(); index++) {
+                JSONObject rule = importedRules.optJSONObject(index);
+                if (rule != null && hasValidTarget(rule, runtimeOutbounds, importedRouting)) {
+                    rules.put(rule);
+                }
+            }
         }
         if (customRuPreset) {
             rules.put(new JSONObject()
@@ -154,7 +196,7 @@ public final class XrayConfigFactory {
         }
         JSONArray customRules = customRules(
             settings.customDomains(),
-            "proxy_only".equals(routingMode) ? "proxy" : "direct"
+            "proxy_only".equals(routingMode) ? proxyTag : "direct"
         );
         for (int index = 0; index < customRules.length(); index++) {
             rules.put(customRules.getJSONObject(index));
@@ -188,10 +230,76 @@ public final class XrayConfigFactory {
                 .put("ip", new JSONArray().put("geoip:ru"))
                 .put("outboundTag", "direct"));
         }
-        config.put("routing", new JSONObject()
-            .put("domainStrategy", "IPIfNonMatch")
-            .put("rules", rules));
+        JSONObject runtimeRouting = importedRouting == null
+            ? new JSONObject()
+            : new JSONObject(importedRouting.toString());
+        runtimeRouting.put("domainStrategy", "IPIfNonMatch");
+        runtimeRouting.put("rules", rules);
+        config.put("routing", runtimeRouting);
         return config.toString();
+    }
+
+    private static boolean isProxyProtocol(String protocol) {
+        return "vless".equals(protocol)
+            || "vmess".equals(protocol)
+            || "trojan".equals(protocol)
+            || "shadowsocks".equals(protocol);
+    }
+
+    private static boolean isRuntimeProtocol(String protocol) {
+        return isProxyProtocol(protocol)
+            || "socks".equals(protocol)
+            || "freedom".equals(protocol)
+            || "blackhole".equals(protocol);
+    }
+
+    private static String ensureTag(JSONObject outbound, String fallback) throws JSONException {
+        String tag = outbound.optString("tag", "").trim();
+        if (tag.isEmpty()) {
+            tag = fallback;
+            outbound.put("tag", tag);
+        }
+        return tag;
+    }
+
+    private static boolean hasValidTarget(
+        JSONObject rule,
+        JSONArray outbounds,
+        JSONObject routing
+    ) {
+        String outboundTag = rule.optString("outboundTag", "").trim();
+        if (!outboundTag.isEmpty() && !hasOutboundTag(outbounds, outboundTag)) {
+            return false;
+        }
+        String balancerTag = rule.optString("balancerTag", "").trim();
+        return balancerTag.isEmpty() || hasBalancerTag(routing, balancerTag);
+    }
+
+    private static boolean hasOutboundTag(JSONArray outbounds, String tag) {
+        for (int index = 0; index < outbounds.length(); index++) {
+            JSONObject outbound = outbounds.optJSONObject(index);
+            if (outbound != null && tag.equals(outbound.optString("tag"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasBalancerTag(JSONObject routing, String tag) {
+        if (routing == null) {
+            return false;
+        }
+        JSONArray balancers = routing.optJSONArray("balancers");
+        if (balancers == null) {
+            return false;
+        }
+        for (int index = 0; index < balancers.length(); index++) {
+            JSONObject balancer = balancers.optJSONObject(index);
+            if (balancer != null && tag.equals(balancer.optString("tag"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static JSONArray customRules(String source, String outboundTag)
